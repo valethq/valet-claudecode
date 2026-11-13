@@ -101,12 +101,26 @@ export function mapMessage(m: SDKMessage, st: TurnState, aborted: () => boolean)
         });
     }
     case "system": {
+      if (m.subtype === "status") {
+        if (m.status === "compacting") return [{ type: "compaction-start" }];
+        if (m.compact_result !== undefined)
+          return [
+            {
+              type: "compaction-end",
+              status: m.compact_result === "success" ? "completed" : "failed",
+              ...(m.compact_error ? { error: m.compact_error } : {}),
+            },
+          ];
+        return [];
+      }
       if (m.subtype === "compact_boundary") {
         const { pre_tokens: from, post_tokens: to } = m.compact_metadata;
         if (to !== undefined) st.contextTokens = to;
         st.log?.info("claude code compacted the context", { from, to, trigger: m.compact_metadata.trigger });
+        // start is idempotent, so this also opens the marker when no "compacting" status came first
         return [
-          { type: "compaction" },
+          { type: "compaction-start" },
+          { type: "compaction-end", status: "completed" },
           ...(to === undefined ? [] : [{ type: "usage" as const, contextTokens: to }]),
         ];
       }

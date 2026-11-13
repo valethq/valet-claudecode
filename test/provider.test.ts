@@ -302,3 +302,24 @@ test("listModels uses config, else the defaults", async () => {
   h = fakeCtx({ models: [{ id: "x", contextWindow: 1_000_000 }] }, deps);
   expect(await h.provider.listModels()).toMatchObject([{ id: "x", name: "x", contextWindow: 1_000_000 }]);
 });
+
+test("/compact runs as a turn and reports the compaction start and end", async () => {
+  const script = async function* (userText: string) {
+    if (userText !== "/compact keep the todo list") throw new Error(`unexpected prompt: ${userText}`);
+    yield { type: "system", subtype: "status", status: "compacting" } as never;
+    yield {
+      type: "system",
+      subtype: "compact_boundary",
+      compact_metadata: { trigger: "manual", pre_tokens: 1000, post_tokens: 200 },
+    } as never;
+    yield result();
+  };
+  const { deps } = fakeSdk(script);
+  h = fakeCtx({}, deps);
+  const s = await open(h);
+  if (!s.compact) throw new Error("claude code session should support compact");
+  const events = await collect(s.compact("keep the todo list", ac()));
+  expect(events).toContainEqual({ type: "compaction-start" });
+  expect(events).toContainEqual({ type: "compaction-end", status: "completed" });
+  expect(events.at(-1)).toEqual({ type: "finish", reason: "stop" });
+});

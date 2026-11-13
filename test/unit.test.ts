@@ -62,6 +62,26 @@ test("mcpServerConfig is sorted by name", () => {
 
 const sys = (m: Record<string, unknown>) => m as never;
 
+test("a compacting status opens the marker; a failed compact_result closes it with the error", () => {
+  const st = newTurnState();
+  expect(
+    mapMessage(sys({ type: "system", subtype: "status", status: "compacting" }), st, () => false),
+  ).toEqual([{ type: "compaction-start" }]);
+  expect(
+    mapMessage(
+      sys({
+        type: "system",
+        subtype: "status",
+        status: null,
+        compact_result: "failed",
+        compact_error: "boom",
+      }),
+      st,
+      () => false,
+    ),
+  ).toEqual([{ type: "compaction-end", status: "failed", error: "boom" }]);
+});
+
 test("compaction becomes a marker event; retries and rate limits become notices", () => {
   const st = newTurnState();
   const compact = mapMessage(
@@ -73,7 +93,11 @@ test("compaction becomes a marker event; retries and rate limits become notices"
     st,
     () => false,
   );
-  expect(compact).toEqual([{ type: "compaction" }, { type: "usage", contextTokens: 30_000 }]);
+  expect(compact).toEqual([
+    { type: "compaction-start" },
+    { type: "compaction-end", status: "completed" },
+    { type: "usage", contextTokens: 30_000 },
+  ]);
   expect(
     mapMessage(
       sys({ type: "system", subtype: "api_retry", attempt: 2, max_retries: 5, error_status: 529 }),

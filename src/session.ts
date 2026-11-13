@@ -171,14 +171,30 @@ export class ClaudeCodeSession implements AgentSession {
     input: { content: ModelContent[]; preamble?: string },
     signal: AbortSignal,
   ): AsyncIterable<AgentEvent> {
+    let content: Block[];
+    try {
+      content = await this.blocks(input);
+    } catch (e) {
+      this.drop();
+      yield { type: "finish", reason: "error", error: (e as Error).message };
+      return;
+    }
+    yield* this.turn(content, signal);
+  }
+
+  /** `/compact` runs as a turn; Claude Code reports the compaction in that turn's stream. */
+  compact(instructions: string | undefined, signal: AbortSignal): AsyncIterable<AgentEvent> {
+    const text = instructions ? `/compact ${instructions}` : "/compact";
+    return this.turn([{ type: "text", text }], signal);
+  }
+
+  private async *turn(content: Block[], signal: AbortSignal): AsyncIterable<AgentEvent> {
     clearTimeout(this.idle);
     let q: Query;
-    let content: Block[];
     try {
       q = await this.ensure();
       await this.settle(q);
       q = await this.ensure();
-      content = await this.blocks(input);
     } catch (e) {
       this.drop();
       yield { type: "finish", reason: "error", error: (e as Error).message };
