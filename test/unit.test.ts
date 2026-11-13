@@ -38,11 +38,10 @@ test("resolveModel splits an effort suffix", () => {
   expect(resolveModel("claude-sonnet-5-5")).toEqual({ model: "claude-sonnet-5-5" });
 });
 
-test("toModelInfos offers one picker entry per declared effort", () => {
+test("toModelInfos offers one picker entry per declared effort and no bare entry", () => {
   expect(
     toModelInfos({ id: "claude-opus-5-5", name: "Opus", efforts: ["low", "max"] }).map((m) => [m.id, m.name]),
   ).toEqual([
-    ["claude-opus-5-5", "Opus"],
     ["claude-opus-5-5-low", "Opus (low)"],
     ["claude-opus-5-5-max", "Opus (max)"],
   ]);

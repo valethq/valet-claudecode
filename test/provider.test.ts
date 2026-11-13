@@ -297,7 +297,7 @@ test("each turn logs cache statistics", async () => {
 test("listModels uses config, else the defaults", async () => {
   const { deps } = fakeSdk(pong);
   h = fakeCtx({}, deps);
-  expect((await h.provider.listModels()).map((m) => m.id)).toContain("claude-opus-5-5");
+  expect((await h.provider.listModels()).map((m) => m.id)).not.toContain("claude-opus-5-5");
   expect((await h.provider.listModels()).map((m) => m.id)).toContain("claude-opus-5-5-high");
   h = fakeCtx({ models: [{ id: "x", contextWindow: 1_000_000 }] }, deps);
   expect(await h.provider.listModels()).toMatchObject([{ id: "x", name: "x", contextWindow: 1_000_000 }]);

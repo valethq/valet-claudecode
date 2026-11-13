@@ -31,7 +31,8 @@ export interface ClaudeCodeConfig {
   models?: ModelConfig[];
 }
 
-const DEFAULT_EFFORTS: Effort[] = ["medium", "high"];
+/** Every level the Claude 5 family reports as supported (SDK supportedModels()). */
+const DEFAULT_EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
 
 export const DEFAULT_MODELS: ModelConfig[] = [
   { id: "claude-opus-5-5", name: "Claude Opus 5.5", efforts: DEFAULT_EFFORTS },

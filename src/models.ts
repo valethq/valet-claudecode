@@ -9,7 +9,7 @@ export function resolveModel(id: string): { model: string; effort?: Effort } {
   return effort ? { model: id.replace(EFFORT_SUFFIX, ""), effort } : { model: id };
 }
 
-/** The bare model, then one picker entry per declared effort: "<id>-<effort>". */
+/** One picker entry per declared effort: "<id>-<effort>". Without declared efforts, just the bare model. */
 export function toModelInfos(m: ModelConfig): ModelInfo[] {
   const base: ModelInfo = {
     id: m.id,
@@ -19,10 +19,8 @@ export function toModelInfos(m: ModelConfig): ModelInfo[] {
     input: ["text", "image"],
     reasoning: true,
   };
-  return [
-    base,
-    ...(m.efforts ?? []).map((e) => ({ ...base, id: `${m.id}-${e}`, name: `${base.name} (${e})` })),
-  ];
+  if (!m.efforts?.length) return [base];
+  return m.efforts.map((e) => ({ ...base, id: `${m.id}-${e}`, name: `${base.name} (${e})` }));
 }
 
 export function modelLister(cfg: () => ClaudeCodeConfig | undefined) {

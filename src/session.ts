@@ -67,6 +67,8 @@ export class ClaudeCodeSession implements AgentSession {
         ...(resume ? { resume: id } : { sessionId: id }),
         model: this.model,
         ...(this.effort && { effort: this.effort }),
+        // newer models default to omitting thinking text; "summarized" streams the reasoning summary as thinking_delta
+        thinking: { type: "adaptive", display: "summarized" },
         includePartialMessages: true,
         settingSources: cfg.settingSources ?? ["project", "local"],
         permissionMode: mode,
