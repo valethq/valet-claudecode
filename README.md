@@ -11,7 +11,7 @@ Imports `@valethq/sdk` only, plus the Agent SDK. The Agent SDK is the one depend
 - One long-lived `claude` child per valet session, driven through the SDK's streaming-input `query()`. Each valet turn pushes one user message and reads until the `result` message.
 - `open()` stores the SDK session id as `resumeId`. If that session is on disk (`getSessionInfo`), the next start uses `resume`. If not, a fresh id is used and the session is marked `reseeded` so the caller sends the preamble.
 - Idle children are closed after `idleCloseMs` (default 15 min) and resumed by the next prompt. Resume rebuilds the same prompt prefix, so it doesn't cost cache.
-- `setModel("claude-opus-5-5-high")` splits a trailing effort word: model via `Query.setModel`, effort via `applyFlagSettings`. Nothing is sent when the value didn't change.
+- `setModel("claude-opus-5-5-high")` splits a trailing effort word: model via `Query.setModel`, effort via `applyFlagSettings`. Nothing is sent when the value didn't change. `listModels` offers those `-<effort>` ids in the picker for each model's `efforts`.
 - Abort calls `Query.interrupt()`; the child stays up for the next turn.
 
 ## Prompt cache rules (read before changing the session code)
@@ -29,16 +29,16 @@ These come from measuring the SDK on this host and from [t3code#22841](https://g
 
 ## Config (`plugins.valet-claudecode.config`)
 
-| Key                                        | Meaning                                                                                                                           |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `permissionMode`                           | `default` / `acceptEdits` (default) / `plan` / `bypassPermissions`. Also a settings panel (`valet-claudecode`) that overrides it. |
-| `denyTools`                                | Hard-denied tools (`disallowedTools`), e.g. `["Bash"]` to steer to `valet-exec` over MCP.                                         |
-| `appendSystemPrompt`                       | Static text appended to the system prompt.                                                                                        |
-| `settingSources`                           | Default `["project", "local"]`.                                                                                                   |
-| `promptCacheTtl`, `subagentPromptCacheTtl` | `"5m"` or `"1h"`; unset means default.                                                                                            |
-| `idleCloseMs`                              | Default 900000; `0` never closes.                                                                                                 |
-| `pathToClaudeCodeExecutable`               | Default is the SDK's bundled binary.                                                                                              |
-| `models`                                   | Override the model list (`id`, `name?`, `contextWindow?`, `maxOutputTokens?`).                                                    |
+| Key                                        | Meaning                                                                                                                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `permissionMode`                           | `default` / `acceptEdits` (default) / `plan` / `bypassPermissions`. Also a settings panel (`valet-claudecode`) that overrides it.                                             |
+| `denyTools`                                | Hard-denied tools (`disallowedTools`), e.g. `["Bash"]` to steer to `valet-exec` over MCP.                                                                                     |
+| `appendSystemPrompt`                       | Static text appended to the system prompt.                                                                                                                                    |
+| `settingSources`                           | Default `["project", "local"]`.                                                                                                                                               |
+| `promptCacheTtl`, `subagentPromptCacheTtl` | `"5m"` or `"1h"`; unset means default.                                                                                                                                        |
+| `idleCloseMs`                              | Default 900000; `0` never closes.                                                                                                                                             |
+| `pathToClaudeCodeExecutable`               | Default is the SDK's bundled binary.                                                                                                                                          |
+| `models`                                   | Override the model list (`id`, `name?`, `contextWindow?`, `maxOutputTokens?`, `efforts?`). `efforts` adds picker entries `<id>-<effort>`. Defaults offer `medium` and `high`. |
 
 Config is read when a session's child (re)starts, so changes apply to the next start rather than needing a valet restart.
 

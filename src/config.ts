@@ -1,6 +1,18 @@
 export type PermissionMode = "default" | "acceptEdits" | "plan" | "bypassPermissions";
 export const MODES: readonly PermissionMode[] = ["default", "acceptEdits", "plan", "bypassPermissions"];
 
+export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type Effort = (typeof EFFORTS)[number];
+
+export interface ModelConfig {
+  id: string;
+  name?: string;
+  contextWindow?: number;
+  maxOutputTokens?: number;
+  /** Effort levels offered as picker entries ("<id>-<effort>"). Unset = bare id only. */
+  efforts?: Effort[];
+}
+
 export interface ClaudeCodeConfig {
   permissionMode?: PermissionMode;
   /** Tools Claude Code may never use (hard deny), e.g. ["Bash"] to steer to valet-exec over MCP. */
@@ -16,14 +28,16 @@ export interface ClaudeCodeConfig {
   /** Close the idle `claude` child after this long; the next prompt resumes it. 0 disables. Default 15 min. */
   idleCloseMs?: number;
   pathToClaudeCodeExecutable?: string;
-  models?: { id: string; name?: string; contextWindow?: number; maxOutputTokens?: number }[];
+  models?: ModelConfig[];
 }
 
-export const DEFAULT_MODELS = [
-  { id: "claude-opus-5-5", name: "Claude Opus 5.5" },
-  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5" },
-  { id: "claude-haiku-5-5", name: "Claude Haiku 5.5" },
-  { id: "claude-fable-5-2", name: "Claude Fable 5.2" },
+const DEFAULT_EFFORTS: Effort[] = ["medium", "high"];
+
+export const DEFAULT_MODELS: ModelConfig[] = [
+  { id: "claude-opus-5-5", name: "Claude Opus 5.5", efforts: DEFAULT_EFFORTS },
+  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", efforts: DEFAULT_EFFORTS },
+  { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", efforts: DEFAULT_EFFORTS },
+  { id: "claude-fable-5-2", name: "Claude Fable 5.2", efforts: DEFAULT_EFFORTS },
 ];
 
 export const DEFAULT_IDLE_CLOSE_MS = 15 * 60_000;

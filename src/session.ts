@@ -2,9 +2,9 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/c
 import type { AgentEvent, AgentOpenOptions, AgentSession, Logger, ModelContent } from "@valethq/sdk";
 import { cacheStats, claudeEnv } from "./cache";
 import { InputQueue } from "./channel";
-import type { ClaudeCodeConfig, PermissionMode } from "./config";
+import type { ClaudeCodeConfig, Effort, PermissionMode } from "./config";
 import { mapMessage, mapResult, newTurnState } from "./events";
-import { type Effort, resolveModel } from "./models";
+import { resolveModel } from "./models";
 import type { SdkDeps } from "./sdk";
 
 export interface SessionInit {

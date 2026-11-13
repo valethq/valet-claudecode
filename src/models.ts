@@ -1,8 +1,6 @@
 import type { ModelInfo } from "@valethq/sdk";
-import { type ClaudeCodeConfig, DEFAULT_MODELS } from "./config";
+import { type ClaudeCodeConfig, DEFAULT_MODELS, EFFORTS, type Effort, type ModelConfig } from "./config";
 
-const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
-export type Effort = (typeof EFFORTS)[number];
 const EFFORT_SUFFIX = new RegExp(`-(${EFFORTS.join("|")})$`);
 
 /** "claude-opus-5-5-high" -> { model: "claude-opus-5-5", effort: "high" }. Ids without a suffix pass through. */
@@ -11,8 +9,9 @@ export function resolveModel(id: string): { model: string; effort?: Effort } {
   return effort ? { model: id.replace(EFFORT_SUFFIX, ""), effort } : { model: id };
 }
 
-export function toModelInfo(m: NonNullable<ClaudeCodeConfig["models"]>[number]): ModelInfo {
-  return {
+/** The bare model, then one picker entry per declared effort: "<id>-<effort>". */
+export function toModelInfos(m: ModelConfig): ModelInfo[] {
+  const base: ModelInfo = {
     id: m.id,
     name: m.name ?? m.id,
     contextWindow: m.contextWindow ?? 200_000,
@@ -20,8 +19,12 @@ export function toModelInfo(m: NonNullable<ClaudeCodeConfig["models"]>[number]):
     input: ["text", "image"],
     reasoning: true,
   };
+  return [
+    base,
+    ...(m.efforts ?? []).map((e) => ({ ...base, id: `${m.id}-${e}`, name: `${base.name} (${e})` })),
+  ];
 }
 
 export function modelLister(cfg: () => ClaudeCodeConfig | undefined) {
-  return async (): Promise<ModelInfo[]> => (cfg()?.models ?? DEFAULT_MODELS).map(toModelInfo);
+  return async (): Promise<ModelInfo[]> => (cfg()?.models ?? DEFAULT_MODELS).flatMap(toModelInfos);
 }

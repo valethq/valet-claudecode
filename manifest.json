@@ -31,7 +31,11 @@
             "id": { "type": "string" },
             "name": { "type": "string" },
             "contextWindow": { "type": "number" },
-            "maxOutputTokens": { "type": "number" }
+            "maxOutputTokens": { "type": "number" },
+            "efforts": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["low", "medium", "high", "xhigh", "max"] }
+            }
           }
         }
       }

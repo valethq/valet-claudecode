@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { cacheStats, claudeEnv, contextTokens } from "../src/cache";
 import { mapMessage, newTurnState } from "../src/events";
-import { resolveModel } from "../src/models";
+import { resolveModel, toModelInfos } from "../src/models";
 import { mcpServerConfig } from "../src/session";
 
 test("claudeEnv sets TTLs only when configured, and an explicit variable wins", () => {
@@ -36,6 +36,17 @@ test("resolveModel splits an effort suffix", () => {
   expect(resolveModel("claude-opus-5-5-high")).toEqual({ model: "claude-opus-5-5", effort: "high" });
   expect(resolveModel("claude-opus-5-5-xhigh")).toEqual({ model: "claude-opus-5-5", effort: "xhigh" });
   expect(resolveModel("claude-sonnet-5-5")).toEqual({ model: "claude-sonnet-5-5" });
+});
+
+test("toModelInfos offers one picker entry per declared effort", () => {
+  expect(
+    toModelInfos({ id: "claude-opus-5-5", name: "Opus", efforts: ["low", "max"] }).map((m) => [m.id, m.name]),
+  ).toEqual([
+    ["claude-opus-5-5", "Opus"],
+    ["claude-opus-5-5-low", "Opus (low)"],
+    ["claude-opus-5-5-max", "Opus (max)"],
+  ]);
+  expect(toModelInfos({ id: "claude-haiku-5-5" }).map((m) => m.id)).toEqual(["claude-haiku-5-5"]);
 });
 
 test("mcpServerConfig is sorted by name", () => {
