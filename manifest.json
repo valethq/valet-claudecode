@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "id": "valet-claudecode",
+  "name": "valet-claudecode",
+  "version": "0.1.0",
+  "description": "inference@1 agent provider claude-code over the Claude Agent SDK.",
+  "valet": "^0.1.0",
+  "main": "./src/index.ts",
+  "provides": ["inference@1", "settings@1"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "permissionMode": { "type": "string", "enum": ["default", "acceptEdits", "plan", "bypassPermissions"] },
+      "denyTools": { "type": "array", "items": { "type": "string" } },
+      "appendSystemPrompt": { "type": "string" },
+      "settingSources": {
+        "type": "array",
+        "items": { "type": "string", "enum": ["user", "project", "local"] }
+      },
+      "promptCacheTtl": { "type": "string", "enum": ["5m", "1h"] },
+      "subagentPromptCacheTtl": { "type": "string", "enum": ["5m", "1h"] },
+      "idleCloseMs": { "type": "number" },
+      "pathToClaudeCodeExecutable": { "type": "string" },
+      "models": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id"],
+          "properties": {
+            "id": { "type": "string" },
+            "name": { "type": "string" },
+            "contextWindow": { "type": "number" },
+            "maxOutputTokens": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}
