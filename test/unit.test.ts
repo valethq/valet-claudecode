@@ -62,7 +62,7 @@ test("mcpServerConfig is sorted by name", () => {
 
 const sys = (m: Record<string, unknown>) => m as never;
 
-test("compaction, retries and rate limits become notices", () => {
+test("compaction becomes a marker event; retries and rate limits become notices", () => {
   const st = newTurnState();
   const compact = mapMessage(
     sys({
@@ -73,10 +73,7 @@ test("compaction, retries and rate limits become notices", () => {
     st,
     () => false,
   );
-  expect(compact).toEqual([
-    { type: "notice", level: "info", text: "Context compacted by Claude Code: 150.0k → 30.0k tokens" },
-    { type: "usage", contextTokens: 30_000 },
-  ]);
+  expect(compact).toEqual([{ type: "compaction" }, { type: "usage", contextTokens: 30_000 }]);
   expect(
     mapMessage(
       sys({ type: "system", subtype: "api_retry", attempt: 2, max_retries: 5, error_status: 529 }),

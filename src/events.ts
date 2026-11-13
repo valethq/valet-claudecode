@@ -33,8 +33,6 @@ function resultText(content: unknown): string {
     .join("");
 }
 
-const k = (n: number) => `${(n / 1000).toFixed(1)}k`;
-
 export function mapMessage(m: SDKMessage, st: TurnState, aborted: () => boolean): AgentEvent[] {
   switch (m.type) {
     case "stream_event": {
@@ -108,11 +106,7 @@ export function mapMessage(m: SDKMessage, st: TurnState, aborted: () => boolean)
         if (to !== undefined) st.contextTokens = to;
         st.log?.info("claude code compacted the context", { from, to, trigger: m.compact_metadata.trigger });
         return [
-          {
-            type: "notice",
-            level: "info",
-            text: `Context compacted by Claude Code: ${k(from)} → ${to === undefined ? "?" : k(to)} tokens`,
-          },
+          { type: "compaction" },
           ...(to === undefined ? [] : [{ type: "usage" as const, contextTokens: to }]),
         ];
       }
