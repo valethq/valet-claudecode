@@ -1,19 +1,7 @@
 import type { PluginContext } from "@valethq/sdk";
 import { type ClaudeCodeConfig, DEFAULT_UTILITY_MODEL, MODES, type PermissionMode } from "./config";
-
-export interface SettingsPanel {
-  title: string;
-  description?: string;
-  schema: Record<string, unknown>;
-  get(): Record<string, unknown> | Promise<Record<string, unknown>>;
-  set(values: Record<string, unknown>): void | Promise<void>;
-}
-
-declare module "@valethq/sdk" {
-  interface ValetScopes {
-    settings: SettingsPanel;
-  }
-}
+import type { SdkDeps } from "./sdk";
+import { createUsage } from "./usage";
 
 /** Panel value wins over config.json so the UI can flip it without a restart. */
 export function permissionMode(ctx: PluginContext<ClaudeCodeConfig>): PermissionMode {
@@ -44,7 +32,8 @@ export function strictMcpConfig(ctx: PluginContext<ClaudeCodeConfig>): boolean {
   return ctx.storage.kv.get<boolean>("strictMcpConfig") ?? ctx.config?.strictMcpConfig ?? true;
 }
 
-export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>): void {
+export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>, deps: SdkDeps): void {
+  const usage = createUsage(ctx, deps);
   ctx.scopes.define({ name: "settings", version: 1, cardinality: "many" });
   ctx.scopes.provide(
     "settings",
@@ -52,6 +41,9 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>): void {
       title: "Claude Code",
       description:
         "Overrides plugins.valet-claudecode.config; applies when a session's Claude Code child (re)starts.",
+      view: () => usage.view(),
+      refreshMs: 15_000,
+      actions: { refresh: () => usage.refresh(true) },
       schema: {
         type: "object",
         properties: {

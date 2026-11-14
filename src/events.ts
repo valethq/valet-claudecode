@@ -34,7 +34,7 @@ function resultText(content: unknown): string {
 }
 
 /** Time left until a rate-limit window resets; `resetsAt` is unix epoch seconds. */
-function untilReset(resetsAt: number, now = Date.now()): string {
+export function untilReset(resetsAt: number, now = Date.now()): string {
   const mins = Math.max(0, Math.round((resetsAt * 1000 - now) / 60_000));
   if (mins < 1) return "less than a minute";
   if (mins < 60) return `${mins} min`;

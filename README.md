@@ -27,6 +27,12 @@ What the plugin does with the SDK's tool controls, all checked on Claude Code 2.
 - **`toolAliases`** redirects a built-in the model emits to another tool, e.g. `{ "Bash": "mcp__valet__exec" }`. The target must accept the built-in's input shape: Claude Code sends `command`, `description` and so on, and an MCP tool with a stricter schema drops the extras. Aliases don't remove the built-in from the prompt; pair them with `denyTools`.
 - **Valet's tools load up front.** The MCP server is passed with `alwaysLoad: true`, so its tools are in the prompt from turn one. Claude Code's default is to defer MCP tools behind ToolSearch, which makes the model search before it can use them. `deferValetTools: true` restores the default.
 
+## Plan usage
+
+The `valet-claudecode` settings panel shows your plan's limits (session, weekly, and per-model weekly) as meters, with a marker for where an even burn-down would be by now and an "On pace / Under pace / Over pace" label. The numbers come from the SDK's `usage()` call, read through a short-lived idle `claude` child (about half a second, no model turn), cached for a minute and re-read at most every 5 minutes after a failure. "Refresh now" forces a read, at most once per 10 seconds. API-key logins have no plan limits and the panel says so.
+
+The SDK method is marked experimental (`usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`), so `src/usage.ts` parses the reply defensively and falls back to the fixed 5-hour and 7-day windows if the server's `limits[]` rows are missing.
+
 ## Prompt cache rules (read before changing the session code)
 
 These come from measuring the SDK on this host and from [t3code#22841](https://github.com/pingdotgg/t3code/pull/22841).

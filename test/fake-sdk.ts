@@ -48,7 +48,11 @@ export const result = (over: Record<string, unknown> = {}) => ({
 });
 
 /** A fake Agent SDK. `script` yields the SDK messages for each user turn. */
-export function fakeSdk(script: Script, sessions: Set<string> = new Set()) {
+export function fakeSdk(
+  script: Script,
+  sessions: Set<string> = new Set(),
+  usage: () => unknown | Promise<unknown> = () => ({ rate_limits_available: false, rate_limits: null }),
+) {
   const calls: FakeCall[] = [];
   const deps: SdkDeps = {
     getSessionInfo: (async (id: string) => (sessions.has(id) ? { sessionId: id } : undefined)) as never,
@@ -102,6 +106,10 @@ export function fakeSdk(script: Script, sessions: Set<string> = new Set()) {
         },
         async applyFlagSettings(...args: unknown[]) {
           call.methods.push({ name: "applyFlagSettings", args });
+        },
+        async usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET(...args: unknown[]) {
+          call.methods.push({ name: "usage", args });
+          return usage();
         },
         close() {
           call.closed = true;
