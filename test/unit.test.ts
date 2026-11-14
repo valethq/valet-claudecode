@@ -135,7 +135,23 @@ test("compaction becomes a marker event; retries and rate limits become notices"
       st,
       () => false,
     ),
-  ).toEqual([{ type: "notice", level: "error", text: "Claude's session limit reached" }]);
+  ).toEqual([{ type: "notice", level: "error", text: "Claude hit its session limit." }]);
+  const inSeconds = (s: number) => Math.floor(Date.now() / 1000) + s;
+  const rejected = (rateLimitType: string, resetsAt: number) =>
+    mapMessage(
+      sys({ type: "rate_limit_event", rate_limit_info: { status: "rejected", rateLimitType, resetsAt } }),
+      st,
+      () => false,
+    );
+  expect(rejected("five_hour", inSeconds(8040))).toEqual([
+    { type: "notice", level: "error", text: "Claude hit its session limit. It resets in 2h 14m." },
+  ]);
+  expect(rejected("seven_day", inSeconds(3 * 86_400 + 2 * 3600))).toEqual([
+    { type: "notice", level: "error", text: "Claude hit its weekly limit. It resets in 3d 2h." },
+  ]);
+  expect(rejected("five_hour", inSeconds(1500))).toEqual([
+    { type: "notice", level: "error", text: "Claude hit its session limit. It resets in 25 min." },
+  ]);
   expect(
     mapMessage(
       sys({

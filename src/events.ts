@@ -33,6 +33,18 @@ function resultText(content: unknown): string {
     .join("");
 }
 
+/** Time left until a rate-limit window resets; `resetsAt` is unix epoch seconds. */
+function untilReset(resetsAt: number, now = Date.now()): string {
+  const mins = Math.max(0, Math.round((resetsAt * 1000 - now) / 60_000));
+  if (mins < 1) return "less than a minute";
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h < 24) return m ? `${h}h ${m}m` : `${h}h`;
+  const rh = h % 24;
+  return rh ? `${Math.floor(h / 24)}d ${rh}h` : `${Math.floor(h / 24)}d`;
+}
+
 export function mapMessage(m: SDKMessage, st: TurnState, aborted: () => boolean): AgentEvent[] {
   switch (m.type) {
     case "stream_event": {
@@ -135,25 +147,20 @@ export function mapMessage(m: SDKMessage, st: TurnState, aborted: () => boolean)
       return [];
     }
     case "rate_limit_event": {
-      const { status, rateLimitType, utilization } = m.rate_limit_info;
+      const { status, rateLimitType, utilization, resetsAt } = m.rate_limit_info;
       if (status === "allowed") return [];
-      const pct = utilization === undefined ? "" : ` (${Math.round(utilization * 100)}% used)`;
       const scope =
         rateLimitType === "five_hour"
           ? "session"
           : rateLimitType?.startsWith("seven_day")
             ? "weekly"
             : "usage";
-      const rejected = status === "rejected";
-      return [
-        {
-          type: "notice",
-          level: rejected ? "error" : "warning",
-          text: rejected
-            ? `Claude's ${scope} limit reached${pct}`
-            : `Approaching Claude's ${scope} limit${pct}`,
-        },
-      ];
+      if (status === "rejected") {
+        const reset = resetsAt === undefined ? "" : ` It resets in ${untilReset(resetsAt)}.`;
+        return [{ type: "notice", level: "error", text: `Claude hit its ${scope} limit.${reset}` }];
+      }
+      const pct = utilization === undefined ? "" : ` (${Math.round(utilization * 100)}% used)`;
+      return [{ type: "notice", level: "warning", text: `Approaching Claude's ${scope} limit${pct}` }];
     }
     default:
       return [];
