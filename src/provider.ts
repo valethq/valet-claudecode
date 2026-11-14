@@ -4,7 +4,7 @@ import type { ClaudeCodeConfig } from "./config";
 import { modelLister } from "./models";
 import { realSdk, type SdkDeps } from "./sdk";
 import { ClaudeCodeSession } from "./session";
-import { disableClaudeAiConnectors, permissionMode, strictMcpConfig } from "./settings";
+import { disableClaudeAiConnectors, hideBuiltinTools, permissionMode, strictMcpConfig } from "./settings";
 import { createUtility } from "./utility";
 
 export const PROVIDER_KEY = "claude-code";
@@ -46,6 +46,7 @@ export function createProvider(
         reseeded: opts.resumeId !== undefined && id !== opts.resumeId,
         cfg: () => ctx.config ?? {},
         flags: () => ({
+          hideBuiltinTools: hideBuiltinTools(ctx),
           disableClaudeAiConnectors: disableClaudeAiConnectors(ctx),
           strictMcpConfig: strictMcpConfig(ctx),
         }),

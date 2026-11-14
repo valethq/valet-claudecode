@@ -3,6 +3,7 @@ import type { PluginContext } from "@valethq/sdk";
 import type { ClaudeCodeConfig } from "../src/config";
 import {
   disableClaudeAiConnectors,
+  hideBuiltinTools,
   registerSettings,
   type SettingsPanel,
   strictMcpConfig,
@@ -33,10 +34,22 @@ function panelOf(ctx: PluginContext<ClaudeCodeConfig>): SettingsPanel {
 }
 
 describe("connector and MCP flags", () => {
-  test("both default to on: valet's tools only", () => {
+  test("connectors and extra MCP servers default to hidden; built-in tools default to shown", () => {
     const ctx = ctxWith({});
     expect(disableClaudeAiConnectors(ctx)).toBe(true);
     expect(strictMcpConfig(ctx)).toBe(true);
+    expect(hideBuiltinTools(ctx)).toBe(false);
+  });
+
+  test("hideBuiltinTools comes from config.json and the panel overrides it", async () => {
+    const ctx = ctxWith({ hideBuiltinTools: true });
+    expect(hideBuiltinTools(ctx)).toBe(true);
+    const panel = panelOf(ctx);
+    const props = panel.schema.properties as Record<string, { type: string }>;
+    expect(props.hideBuiltinTools?.type).toBe("boolean");
+    await panel.set({ hideBuiltinTools: false });
+    expect(hideBuiltinTools(ctx)).toBe(false);
+    expect(await panel.get()).toMatchObject({ hideBuiltinTools: false });
   });
 
   test("config.json turns them off", () => {

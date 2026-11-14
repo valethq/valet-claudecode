@@ -27,7 +27,12 @@ export function utilityModel(ctx: PluginContext<ClaudeCodeConfig>): string | und
   return v.trim() === "" ? undefined : v.trim();
 }
 
-/** Panel value wins over config.json. Default true: valet's tools only. */
+/** Panel value wins over config.json. Default false: Claude Code's built-in tools stay available. */
+export function hideBuiltinTools(ctx: PluginContext<ClaudeCodeConfig>): boolean {
+  return ctx.storage.kv.get<boolean>("hideBuiltinTools") ?? ctx.config?.hideBuiltinTools ?? false;
+}
+
+/** Panel value wins over config.json. Default true: no claude.ai account connectors. */
 export function disableClaudeAiConnectors(ctx: PluginContext<ClaudeCodeConfig>): boolean {
   return (
     ctx.storage.kv.get<boolean>("disableClaudeAiConnectors") ?? ctx.config?.disableClaudeAiConnectors ?? true
@@ -62,23 +67,30 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>): void {
             title: "Utility model",
             description: "Model for small side jobs such as naming sessions. Empty turns them off.",
           },
+          hideBuiltinTools: {
+            type: "boolean",
+            title: "Hide built-in tools",
+            description:
+              "Remove Claude Code's own tools (Bash, Read, Write, Edit, Agent, Skill, ToolSearch, ...) so only valet's MCP tools are offered.",
+          },
           disableClaudeAiConnectors: {
             type: "boolean",
             title: "Hide claude.ai connectors",
             description:
-              "Hide your claude.ai account connectors (Gmail, GitHub, ...) from sessions. On: valet's tools only.",
+              "Hide your claude.ai account connectors (Gmail, GitHub, ...). Does not affect built-in tools.",
           },
           strictMcpConfig: {
             type: "boolean",
             title: "Only valet's MCP servers",
             description:
-              "Ignore project .mcp.json, user settings and plugins. On: only the MCP servers valet passes.",
+              "Ignore project .mcp.json, user settings and plugins, so valet's is the only MCP server. Does not affect built-in tools.",
           },
         },
       },
       get: () => ({
         permissionMode: permissionMode(ctx),
         utilityModel: utilityModel(ctx) ?? "",
+        hideBuiltinTools: hideBuiltinTools(ctx),
         disableClaudeAiConnectors: disableClaudeAiConnectors(ctx),
         strictMcpConfig: strictMcpConfig(ctx),
       }),
@@ -90,7 +102,7 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>): void {
           throw new Error("utilityModel must be a string");
         if (mode !== undefined) ctx.storage.kv.set("permissionMode", mode);
         if (typeof v.utilityModel === "string") ctx.storage.kv.set("utilityModel", v.utilityModel);
-        for (const key of ["disableClaudeAiConnectors", "strictMcpConfig"] as const) {
+        for (const key of ["hideBuiltinTools", "disableClaudeAiConnectors", "strictMcpConfig"] as const) {
           const flag = v[key];
           if (flag === undefined) continue;
           if (typeof flag !== "boolean") throw new Error(`${key} must be true or false`);

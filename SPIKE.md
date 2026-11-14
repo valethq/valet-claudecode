@@ -12,6 +12,7 @@ Measured on this host, logged in with `claude.ai` auth (subscription). Results t
 
 ## Open items
 
-- **valet MCP tools.** `valet-agent` passes `mcpServers: []` today, and the per-run MCP route is not built. When it is, the SDK fixes `mcpServers` for the child's lifetime, so the endpoint needs a session-scoped credential (not a short-lived per-run token) or the child restarts every run. Tool-set stability also keeps the cache warm.
-- **Steering off built-in Bash.** Use `denyTools: ["Bash"]` once `valet-exec` is served over MCP, so long jobs survive restarts.
+- **valet MCP tools.** `valet-agent` passes `mcpServers: []` today, and the per-run MCP route is not built. When it is, the endpoint can use a session-scoped credential. A changed tool list no longer forces a restart: `Query.setMcpServers` adds servers mid-session as an append-only `tool_addition` system message (measured on Haiku 5.5, 2.1.323, 0.3.323: cache mostly kept). Removal is unmeasured.
+- **Steering off built-in Bash.** Use `denyTools: ["Bash"]` once `valet-exec` is served over MCP, so long jobs survive restarts. `toolAliases: { Bash: "mcp__valet__exec" }` also works (a model that emits `Bash` gets the MCP tool run); the MCP tool must accept Bash's input shape.
+- **Measured on 2.1.323.** `tools: []` removes every built-in. A `PreToolUse` hook that throws lets the tool run unless the matcher sets `onFailure: "block"`. Subagent tool calls hit `PreToolUse` with `agent_id` set. `disallowedTools: ["Agent"]` and `["Task"]` both remove the Agent tool. A custom `systemPrompt` is still wrapped by the binary: a billing-header block and "You are a Claude agent, built on Anthropic's Claude Agent SDK." come first, and an Environment block and a user-email reminder are injected into the messages.
 - **Subagents.** Claude Code's own subagents are the 5m bucket. `subagentPromptCacheTtl` is available if that matters.

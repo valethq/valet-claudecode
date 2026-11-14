@@ -17,6 +17,21 @@ export interface ClaudeCodeConfig {
   permissionMode?: PermissionMode;
   /** Tools Claude Code may never use (hard deny), e.g. ["Bash"] to steer to valet-exec over MCP. */
   denyTools?: string[];
+  /**
+   * Base set of built-in tools Claude Code offers (SDK `tools`). `[]` removes them all, leaving valet's MCP
+   * tools. Unset keeps Claude Code's defaults. `denyTools` is still applied on top.
+   */
+  tools?: string[];
+  /**
+   * Runs a built-in tool the model emits as another tool, e.g. `{ Bash: "mcp__valet__exec" }` (SDK
+   * `toolAliases`). The target must accept the built-in's input shape. It redirects calls to a tool that is
+   * still offered or named by a skill; to stop a built-in being offered, use `denyTools` or `tools`.
+   */
+  toolAliases?: Record<string, string>;
+  /** Remove every Claude Code built-in tool, leaving valet's MCP tools (`tools: []`). Wins over `tools`. Also in the settings panel. Default false. */
+  hideBuiltinTools?: boolean;
+  /** Defer valet's MCP tools behind Claude Code's tool search instead of loading them into the prompt. Default false. */
+  deferValetTools?: boolean;
   /** Appended to the claude_code system prompt. Static per plugin config: it is part of the cached prefix. */
   appendSystemPrompt?: string;
   /** Which Claude Code settings files to load. Default ["project", "local"] keeps the prefix deterministic. */

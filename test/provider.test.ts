@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import type { AgentEvent } from "@valethq/sdk";
-import { fakeSdk, result, text } from "./fake-sdk";
+import { fakeSdk, init, result, text } from "./fake-sdk";
 import { collect, fakeCtx, input, open } from "./helpers";
 
 const ac = () => new AbortController().signal;
@@ -55,6 +55,7 @@ test("open: new session, cache-stable options", async () => {
     type: "http",
     url: "http://127.0.0.1:7437/plugins/valet-claudecode/mcp/s1",
     headers: { authorization: expect.stringMatching(/^Bearer [0-9a-f-]{36}$/) },
+    alwaysLoad: true,
   });
   expect(o.env.CLAUDE_CODE_PROMPT_CACHE_TTL).toBe("5m");
 });
@@ -380,4 +381,77 @@ test("connector and MCP flags reach the child: defaults on, panel overrides appl
   const second = calls[1]?.options as { settings?: unknown; strictMcpConfig?: boolean };
   expect(second.settings).toBeUndefined();
   expect(second.strictMcpConfig).toBe(false);
+});
+
+test("tool options: tools, toolAliases and a fail-closed PreToolUse gate reach the SDK", async () => {
+  const { deps, calls } = fakeSdk(pong);
+  h = fakeCtx({ tools: ["Read"], toolAliases: { Bash: "mcp__valet__exec" }, deferValetTools: true }, deps);
+  const s = await open(h);
+  await collect(s.prompt(input("hi"), ac()));
+  const o = calls[0]?.options as {
+    tools?: string[];
+    toolAliases?: Record<string, string>;
+    mcpServers: { valet: Record<string, unknown> };
+    hooks: { PreToolUse: { onFailure?: string; hooks: unknown[] }[] };
+  };
+  expect(o.tools).toEqual(["Read"]);
+  expect(o.toolAliases).toEqual({ Bash: "mcp__valet__exec" });
+  expect(o.mcpServers.valet).not.toHaveProperty("alwaysLoad");
+  expect(o.hooks.PreToolUse).toHaveLength(1);
+  expect(o.hooks.PreToolUse[0]?.onFailure).toBe("block");
+});
+
+test("tools and toolAliases are left out when unset", async () => {
+  const { deps, calls } = fakeSdk(pong);
+  h = fakeCtx({ toolAliases: {} }, deps);
+  const s = await open(h);
+  await collect(s.prompt(input("hi"), ac()));
+  const o = calls[0]?.options as Record<string, unknown>;
+  expect(o).not.toHaveProperty("tools");
+  expect(o).not.toHaveProperty("toolAliases");
+});
+
+test("a child that still offers a denied tool is closed and the turn fails", async () => {
+  const { deps, calls } = fakeSdk(async function* () {
+    yield init(["Read", "Bash"]);
+    yield* text("m1", "should not be shown");
+    yield result();
+  });
+  h = fakeCtx({ denyTools: ["Bash"] }, deps);
+  const s = await open(h);
+  const events = await collect(s.prompt(input("hi"), ac()));
+  expect(events).toEqual([
+    { type: "finish", reason: "error", error: "denied tools are still available: Bash" },
+  ]);
+  expect(calls[0]?.closed).toBe(true);
+  expect(h.logs.some((l) => l.level === "error" && l.msg.includes("ignored denyTools"))).toBe(true);
+});
+
+test("a child whose tool list honours denyTools runs normally", async () => {
+  const { deps, calls } = fakeSdk(async function* () {
+    yield init(["Read", "Edit"]);
+    yield* text("m1", "pong");
+    yield result();
+  });
+  h = fakeCtx({ denyTools: ["Bash", "Write(/etc/*)"] }, deps);
+  const s = await open(h);
+  const events = await collect(s.prompt(input("hi"), ac()));
+  expect(types(events)).toContain("text-delta");
+  expect(events.at(-1)).toMatchObject({ type: "finish", reason: "stop" });
+  expect(calls[0]?.closed).toBe(false);
+});
+
+test("hideBuiltinTools sends tools: [] and beats a configured tools list; the panel applies at the next start", async () => {
+  const { deps, calls } = fakeSdk(pong);
+  h = fakeCtx({ tools: ["Read"], hideBuiltinTools: true }, deps);
+  const s = await open(h);
+  await collect(s.prompt(input("hi"), ac()));
+  const first = calls[0]?.options as { tools?: string[] };
+  expect(first.tools).toEqual([]);
+
+  h.kv.set("hideBuiltinTools", false);
+  const s2 = await open(h, { sessionId: "s2" });
+  await collect(s2.prompt(input("hi"), ac()));
+  const second = calls[1]?.options as { tools?: string[] };
+  expect(second.tools).toEqual(["Read"]);
 });

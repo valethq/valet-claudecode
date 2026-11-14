@@ -13,6 +13,13 @@
     "properties": {
       "permissionMode": { "type": "string", "enum": ["default", "acceptEdits", "plan", "bypassPermissions"] },
       "denyTools": { "type": "array", "items": { "type": "string" } },
+      "tools": { "type": "array", "items": { "type": "string" } },
+      "toolAliases": { "type": "object", "additionalProperties": { "type": "string" } },
+      "deferValetTools": { "type": "boolean" },
+      "hideBuiltinTools": { "type": "boolean" },
+      "disableClaudeAiConnectors": { "type": "boolean" },
+      "strictMcpConfig": { "type": "boolean" },
+      "utilityModel": { "type": "string" },
       "appendSystemPrompt": { "type": "string" },
       "settingSources": {
         "type": "array",

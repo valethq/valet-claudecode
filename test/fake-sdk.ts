@@ -35,6 +35,9 @@ export const text = (id: string, t: string, partial = true) => [
   },
 ];
 
+/** The `system/init` message Claude Code sends when a child starts, listing the tools it offers. */
+export const init = (tools: string[]) => ({ type: "system", subtype: "init", tools });
+
 export const result = (over: Record<string, unknown> = {}) => ({
   type: "result",
   subtype: "success",

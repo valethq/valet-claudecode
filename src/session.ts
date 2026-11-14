@@ -19,6 +19,7 @@ import type { ClaudeCodeConfig, Effort, PermissionMode } from "./config";
 import { mapMessage, mapResult, newTurnState } from "./events";
 import { resolveModel } from "./models";
 import type { SdkDeps } from "./sdk";
+import { leakedTools } from "./tools";
 
 /** Tool names of valet's MCP server ("valet", see provider.ts) as Claude Code reports them. */
 const VALET_TOOL_PREFIX = "mcp__valet__";
@@ -32,8 +33,8 @@ export interface SessionInit {
   tools: ToolSurface;
   reseeded: boolean;
   cfg(): ClaudeCodeConfig;
-  /** Connector and MCP-scope flags, read at each child start so the settings panel applies without a restart. */
-  flags(): { disableClaudeAiConnectors: boolean; strictMcpConfig: boolean };
+  /** Tool-scope flags, read at each child start so the settings panel applies without a restart. */
+  flags(): { hideBuiltinTools: boolean; disableClaudeAiConnectors: boolean; strictMcpConfig: boolean };
   mode(): PermissionMode;
   log: Logger;
   blobPath(id: string): string;
@@ -44,11 +45,23 @@ type Block =
   | { type: "text"; text: string }
   | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
 
-export function mcpServerConfig(servers: McpServerEntry[]): NonNullable<Options["mcpServers"]> {
+/** `alwaysLoad` keeps the tools in the prompt from turn one; by default Claude Code defers MCP tools behind ToolSearch. */
+export function mcpServerConfig(
+  servers: McpServerEntry[],
+  alwaysLoad = true,
+): NonNullable<Options["mcpServers"]> {
   return Object.fromEntries(
     [...servers]
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((s) => [s.name, { type: "http" as const, url: s.url, ...(s.headers && { headers: s.headers }) }]),
+      .map((s) => [
+        s.name,
+        {
+          type: "http" as const,
+          url: s.url,
+          ...(s.headers && { headers: s.headers }),
+          ...(alwaysLoad && { alwaysLoad }),
+        },
+      ]),
   );
 }
 
@@ -61,6 +74,8 @@ export class ClaudeCodeSession implements AgentSession {
   private effort?: Effort;
   private idle?: ReturnType<typeof setTimeout>;
   private lastContext?: number;
+  /** The denyTools the running child was started with, checked against its `system/init` tool list. */
+  private deny?: string[];
 
   constructor(private init: SessionInit) {
     this.reseeded = init.reseeded;
@@ -79,7 +94,9 @@ export class ClaudeCodeSession implements AgentSession {
     const flags = this.init.flags();
     const mode = this.init.mode();
     const resume = !!(await deps.getSessionInfo(id, { dir: cwd }).catch(() => undefined));
-    const mcpServers = mcpServerConfig(this.init.mcpServers);
+    const mcpServers = mcpServerConfig(this.init.mcpServers, !cfg.deferValetTools);
+    this.deny = cfg.denyTools;
+    const tools = flags.hideBuiltinTools ? [] : cfg.tools;
     return {
       prompt: input,
       options: {
@@ -93,7 +110,9 @@ export class ClaudeCodeSession implements AgentSession {
         settingSources: cfg.settingSources ?? ["project", "local"],
         permissionMode: mode,
         ...(mode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
+        ...(tools && { tools }),
         ...(cfg.denyTools?.length && { disallowedTools: cfg.denyTools }),
+        ...(cfg.toolAliases && Object.keys(cfg.toolAliases).length && { toolAliases: cfg.toolAliases }),
         canUseTool: async (_name, toolInput) => ({ behavior: "allow", updatedInput: toolInput }),
         systemPrompt: {
           type: "preset",
@@ -105,7 +124,8 @@ export class ClaudeCodeSession implements AgentSession {
         ...(Object.keys(mcpServers).length && { mcpServers }),
         strictMcpConfig: flags.strictMcpConfig,
         ...(flags.disableClaudeAiConnectors && { settings: { disableClaudeAiConnectors: true } }),
-        hooks: { PreToolUse: [{ hooks: [this.preToolUse] }] },
+        // onFailure "block": a gate that throws or times out must stop the call (the default lets it run)
+        hooks: { PreToolUse: [{ hooks: [this.preToolUse], onFailure: "block" }] },
         env: claudeEnv(cfg),
         ...(cfg.pathToClaudeCodeExecutable && { pathToClaudeCodeExecutable: cfg.pathToClaudeCodeExecutable }),
         stderr: (line) => log.debug("claude stderr", { line: line.trimEnd() }),
@@ -286,6 +306,19 @@ export class ClaudeCodeSession implements AgentSession {
           return;
         }
         const m = next.value;
+        if (m.type === "system" && m.subtype === "init") {
+          const leaked = leakedTools(m.tools, this.deny);
+          if (leaked.length) {
+            const error = `denied tools are still available: ${leaked.join(", ")}`;
+            this.init.log.error("claude code ignored denyTools, closing the child", {
+              session: this.init.id,
+              leaked,
+            });
+            this.drop();
+            yield { type: "finish", reason: "error", error };
+            return;
+          }
+        }
         if (m.type === "result") {
           this.pending = false;
           this.lastContext = state.contextTokens;

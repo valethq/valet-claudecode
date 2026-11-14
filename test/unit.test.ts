@@ -4,6 +4,7 @@ import { mapMessage, newTurnState } from "../src/events";
 import { DEFAULT_MODELS } from "../src/config";
 import { resolveModel, toModelInfos } from "../src/models";
 import { mcpServerConfig } from "../src/session";
+import { leakedTools } from "../src/tools";
 
 test("claudeEnv sets TTLs only when configured, and an explicit variable wins", () => {
   const base = { PATH: "/bin" };
@@ -64,6 +65,20 @@ test("mcpServerConfig is sorted by name", () => {
       ]),
     ),
   ).toEqual(["a", "b"]);
+});
+
+test("mcpServerConfig loads tools up front unless told to defer", () => {
+  const entry = [{ name: "valet", url: "u", headers: {} }];
+  expect(mcpServerConfig(entry).valet).toMatchObject({ alwaysLoad: true });
+  expect(mcpServerConfig(entry, false).valet).not.toHaveProperty("alwaysLoad");
+});
+
+test("leakedTools finds denied names the child still lists, skips rule patterns, and treats Task as Agent", () => {
+  expect(leakedTools(["Read", "Bash"], ["Bash"])).toEqual(["Bash"]);
+  expect(leakedTools(["Read"], ["Bash"])).toEqual([]);
+  expect(leakedTools(["Bash"], ["Bash(rm *)"])).toEqual([]);
+  expect(leakedTools(["Task"], ["Agent"])).toEqual(["Task"]);
+  expect(leakedTools(["Bash"], undefined)).toEqual([]);
 });
 
 const sys = (m: Record<string, unknown>) => m as never;
