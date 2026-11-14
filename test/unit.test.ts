@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { cacheStats, claudeEnv, contextTokens } from "../src/cache";
 import { mapMessage, newTurnState } from "../src/events";
+import { DEFAULT_MODELS } from "../src/config";
 import { resolveModel, toModelInfos } from "../src/models";
 import { mcpServerConfig } from "../src/session";
 
@@ -46,6 +47,12 @@ test("toModelInfos offers one picker entry per declared effort and no bare entry
     ["claude-opus-5-5-max", "Opus (max)"],
   ]);
   expect(toModelInfos({ id: "claude-haiku-5-5" }).map((m) => m.id)).toEqual(["claude-haiku-5-5"]);
+});
+
+test("built-in Claude 5 models advertise the 1M window and 128k output cap", () => {
+  for (const m of DEFAULT_MODELS) {
+    expect(toModelInfos(m)[0]).toMatchObject({ contextWindow: 1_000_000, maxOutputTokens: 128_000 });
+  }
 });
 
 test("mcpServerConfig is sorted by name", () => {

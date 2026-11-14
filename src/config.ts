@@ -36,11 +36,14 @@ export interface ClaudeCodeConfig {
 /** Every level the Claude 5 family reports as supported (SDK supportedModels()). */
 const DEFAULT_EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
 
+/** Context window and output cap shared by the Claude 5 family (Models API: max_input_tokens / max_tokens). */
+const CLAUDE5_LIMITS = { contextWindow: 1_000_000, maxOutputTokens: 128_000 } as const;
+
 export const DEFAULT_MODELS: ModelConfig[] = [
-  { id: "claude-opus-5-5", name: "Claude Opus 5.5", efforts: DEFAULT_EFFORTS },
-  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", efforts: DEFAULT_EFFORTS },
-  { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", efforts: DEFAULT_EFFORTS },
-  { id: "claude-fable-5-2", name: "Claude Fable 5.2", efforts: DEFAULT_EFFORTS },
+  { id: "claude-opus-5-5", name: "Claude Opus 5.5", efforts: DEFAULT_EFFORTS, ...CLAUDE5_LIMITS },
+  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", efforts: DEFAULT_EFFORTS, ...CLAUDE5_LIMITS },
+  { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", efforts: DEFAULT_EFFORTS, ...CLAUDE5_LIMITS },
+  { id: "claude-fable-5-2", name: "Claude Fable 5.2", efforts: DEFAULT_EFFORTS, ...CLAUDE5_LIMITS },
 ];
 
 export const DEFAULT_UTILITY_MODEL = "claude-haiku-5-5";
