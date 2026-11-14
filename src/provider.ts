@@ -5,6 +5,7 @@ import { modelLister } from "./models";
 import { realSdk, type SdkDeps } from "./sdk";
 import { ClaudeCodeSession } from "./session";
 import { permissionMode } from "./settings";
+import { createUtility } from "./utility";
 
 export const PROVIDER_KEY = "claude-code";
 
@@ -18,6 +19,7 @@ export function createProvider(
     id: PROVIDER_KEY,
     label: "Claude Code",
     listModels: modelLister(() => ctx.config),
+    utility: createUtility(ctx, deps),
     async open(opts): Promise<AgentSession> {
       const session = ctx.store.sessions.get(opts.sessionId);
       const project = session && ctx.store.projects.get(session.projectId);

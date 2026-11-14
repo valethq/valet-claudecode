@@ -323,3 +323,48 @@ test("/compact runs as a turn and reports the compaction start and end", async (
   expect(events).toContainEqual({ type: "compaction-end", status: "completed" });
   expect(events.at(-1)).toEqual({ type: "finish", reason: "stop" });
 });
+
+test("utility runs one tool-free turn on the Utility model", async () => {
+  const { deps, calls } = fakeSdk(async function* () {
+    yield result({ result: "  Fixing the Caddy config \n" });
+  });
+  h = fakeCtx({}, deps);
+  expect(h.provider.utility?.model()).toBe("claude-haiku-5-5");
+  const out = await h.provider.utility?.complete({ system: "Title it.", prompt: "caddy is down" }, ac());
+  expect(out).toBe("Fixing the Caddy config");
+  const o = calls[0]?.options as Record<string, unknown>;
+  expect(calls[0]?.prompts).toEqual(["caddy is down"]);
+  expect(o).toMatchObject({
+    model: "claude-haiku-5-5",
+    systemPrompt: "Title it.",
+    tools: [],
+    maxTurns: 1,
+    thinking: { type: "disabled" },
+    settingSources: [],
+    persistSession: false,
+  });
+  expect(calls[0]?.closed).toBe(true);
+});
+
+test("utility follows the panel setting, splits an effort suffix, and can be turned off", async () => {
+  const { deps, calls } = fakeSdk(async function* () {
+    yield result({ result: "ok" });
+  });
+  h = fakeCtx({}, deps);
+  h.kv.set("utilityModel", "claude-sonnet-5-5-low");
+  await h.provider.utility?.complete({ system: "s", prompt: "p" }, ac());
+  expect(calls[0]?.options).toMatchObject({ model: "claude-sonnet-5-5", effort: "low" });
+  h.kv.set("utilityModel", "");
+  expect(h.provider.utility?.model()).toBeUndefined();
+  await expect(h.provider.utility?.complete({ system: "s", prompt: "p" }, ac())).rejects.toThrow(
+    "no utility model",
+  );
+});
+
+test("utility rejects on an error result", async () => {
+  const { deps } = fakeSdk(async function* () {
+    yield result({ subtype: "error_during_execution", is_error: true, errors: ["boom"] });
+  });
+  h = fakeCtx({}, deps);
+  await expect(h.provider.utility?.complete({ system: "s", prompt: "p" }, ac())).rejects.toThrow("boom");
+});

@@ -53,15 +53,24 @@ export function fakeSdk(script: Script, sessions: Set<string> = new Set()) {
       prompt,
       options,
     }: {
-      prompt: AsyncIterable<{ message: { content: { text?: string }[] } }>;
+      prompt: string | AsyncIterable<{ message: { content: { text?: string }[] } }>;
       options: Record<string, unknown>;
     }) => {
       const call: FakeCall = { options, prompts: [], methods: [], closed: false };
       calls.push(call);
-      const it = prompt[Symbol.asyncIterator]();
+      const messages =
+        typeof prompt === "string"
+          ? (async function* () {
+              yield { message: { content: [{ text: prompt }] } };
+            })()
+          : prompt;
+      const it = messages[Symbol.asyncIterator]();
       let aborted = false;
       let current: AsyncGenerator<unknown> | undefined;
       const q = {
+        [Symbol.asyncIterator]() {
+          return q;
+        },
         async next() {
           for (;;) {
             if (!current) {

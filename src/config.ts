@@ -28,6 +28,8 @@ export interface ClaudeCodeConfig {
   /** Close the idle `claude` child after this long; the next prompt resumes it. 0 disables. Default 15 min. */
   idleCloseMs?: number;
   pathToClaudeCodeExecutable?: string;
+  /** Model for small side jobs such as session naming. Empty string turns them off. */
+  utilityModel?: string;
   models?: ModelConfig[];
 }
 
@@ -40,5 +42,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
   { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", efforts: DEFAULT_EFFORTS },
   { id: "claude-fable-5-2", name: "Claude Fable 5.2", efforts: DEFAULT_EFFORTS },
 ];
+
+export const DEFAULT_UTILITY_MODEL = "claude-haiku-5-5";
 
 export const DEFAULT_IDLE_CLOSE_MS = 15 * 60_000;
