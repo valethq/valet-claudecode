@@ -138,11 +138,20 @@ export function mapMessage(m: SDKMessage, st: TurnState, aborted: () => boolean)
       const { status, rateLimitType, utilization } = m.rate_limit_info;
       if (status === "allowed") return [];
       const pct = utilization === undefined ? "" : ` (${Math.round(utilization * 100)}% used)`;
+      const scope =
+        rateLimitType === "five_hour"
+          ? "session"
+          : rateLimitType?.startsWith("seven_day")
+            ? "weekly"
+            : "usage";
+      const rejected = status === "rejected";
       return [
         {
           type: "notice",
-          level: status === "rejected" ? "error" : "warning",
-          text: `Claude ${rateLimitType ?? "usage"} limit ${status === "rejected" ? "reached" : "approaching"}${pct}`,
+          level: rejected ? "error" : "warning",
+          text: rejected
+            ? `Claude's ${scope} limit reached${pct}`
+            : `Approaching Claude's ${scope} limit${pct}`,
         },
       ];
     }

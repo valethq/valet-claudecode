@@ -120,7 +120,17 @@ test("compaction becomes a marker event; retries and rate limits become notices"
       st,
       () => false,
     ),
-  ).toEqual([{ type: "notice", level: "error", text: "Claude five_hour limit reached" }]);
+  ).toEqual([{ type: "notice", level: "error", text: "Claude's session limit reached" }]);
+  expect(
+    mapMessage(
+      sys({
+        type: "rate_limit_event",
+        rate_limit_info: { status: "allowed_warning", rateLimitType: "five_hour", utilization: 0.92 },
+      }),
+      st,
+      () => false,
+    ),
+  ).toEqual([{ type: "notice", level: "warning", text: "Approaching Claude's session limit (92% used)" }]);
 });
 
 test("interrupted tool results map to cancelled when the turn was aborted", () => {
