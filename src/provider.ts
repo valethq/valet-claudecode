@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { AgentProvider, AgentSession, PluginContext } from "@valethq/sdk";
+import { type AgentProvider, type AgentSession, type PluginContext, toolEndpoint } from "@valethq/sdk";
 import type { ClaudeCodeConfig } from "./config";
 import { modelLister } from "./models";
 import { realSdk, type SdkDeps } from "./sdk";
 import { ClaudeCodeSession } from "./session";
-import { permissionMode } from "./settings";
+import { disableClaudeAiConnectors, permissionMode, strictMcpConfig } from "./settings";
 import { createUtility } from "./utility";
 
 export const PROVIDER_KEY = "claude-code";
@@ -14,6 +14,11 @@ export function createProvider(
   deps: SdkDeps = realSdk,
 ): { provider: AgentProvider; dispose(): Promise<void> } {
   const sessions = new Set<ClaudeCodeSession>();
+  const tools = toolEndpoint(ctx.http, {
+    serverName: "valet",
+    version: ctx.plugin.version,
+    readBlob: (blobId) => Bun.file(ctx.store.blobs.path(blobId)).bytes(),
+  });
   const provider: AgentProvider = {
     kind: "agent",
     id: PROVIDER_KEY,
@@ -30,18 +35,27 @@ export function createProvider(
       if (opts.resumeId && !known)
         ctx.log.warn("claude code session not found, reseeding", { resumeId: opts.resumeId });
       const id = opts.resumeId && known ? opts.resumeId : randomUUID();
+      const mcp = tools.expose(opts.sessionId, opts.tools);
       const claude: ClaudeCodeSession = new ClaudeCodeSession({
         deps,
         id,
         cwd,
         model: opts.model,
-        mcpServers: opts.mcpServers,
+        mcpServers: [mcp],
+        tools: opts.tools,
         reseeded: opts.resumeId !== undefined && id !== opts.resumeId,
         cfg: () => ctx.config ?? {},
+        flags: () => ({
+          disableClaudeAiConnectors: disableClaudeAiConnectors(ctx),
+          strictMcpConfig: strictMcpConfig(ctx),
+        }),
         mode: () => permissionMode(ctx),
         log: ctx.log,
         blobPath: (blobId) => ctx.store.blobs.path(blobId),
-        onClose: () => sessions.delete(claude),
+        onClose: () => {
+          sessions.delete(claude);
+          tools.revoke(opts.sessionId);
+        },
       });
       sessions.add(claude);
       ctx.store.sessions.setProviderState(opts.sessionId, PROVIDER_KEY, { resumeId: id });

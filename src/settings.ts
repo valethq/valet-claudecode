@@ -27,6 +27,18 @@ export function utilityModel(ctx: PluginContext<ClaudeCodeConfig>): string | und
   return v.trim() === "" ? undefined : v.trim();
 }
 
+/** Panel value wins over config.json. Default true: valet's tools only. */
+export function disableClaudeAiConnectors(ctx: PluginContext<ClaudeCodeConfig>): boolean {
+  return (
+    ctx.storage.kv.get<boolean>("disableClaudeAiConnectors") ?? ctx.config?.disableClaudeAiConnectors ?? true
+  );
+}
+
+/** Panel value wins over config.json. Default true: only the MCP servers valet passes. */
+export function strictMcpConfig(ctx: PluginContext<ClaudeCodeConfig>): boolean {
+  return ctx.storage.kv.get<boolean>("strictMcpConfig") ?? ctx.config?.strictMcpConfig ?? true;
+}
+
 export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>): void {
   ctx.scopes.define({ name: "settings", version: 1, cardinality: "many" });
   ctx.scopes.provide(
@@ -50,9 +62,26 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>): void {
             title: "Utility model",
             description: "Model for small side jobs such as naming sessions. Empty turns them off.",
           },
+          disableClaudeAiConnectors: {
+            type: "boolean",
+            title: "Hide claude.ai connectors",
+            description:
+              "Hide your claude.ai account connectors (Gmail, GitHub, ...) from sessions. On: valet's tools only.",
+          },
+          strictMcpConfig: {
+            type: "boolean",
+            title: "Only valet's MCP servers",
+            description:
+              "Ignore project .mcp.json, user settings and plugins. On: only the MCP servers valet passes.",
+          },
         },
       },
-      get: () => ({ permissionMode: permissionMode(ctx), utilityModel: utilityModel(ctx) ?? "" }),
+      get: () => ({
+        permissionMode: permissionMode(ctx),
+        utilityModel: utilityModel(ctx) ?? "",
+        disableClaudeAiConnectors: disableClaudeAiConnectors(ctx),
+        strictMcpConfig: strictMcpConfig(ctx),
+      }),
       set: (v) => {
         const mode = v.permissionMode;
         if (mode !== undefined && (typeof mode !== "string" || !(MODES as readonly string[]).includes(mode)))
@@ -61,6 +90,12 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>): void {
           throw new Error("utilityModel must be a string");
         if (mode !== undefined) ctx.storage.kv.set("permissionMode", mode);
         if (typeof v.utilityModel === "string") ctx.storage.kv.set("utilityModel", v.utilityModel);
+        for (const key of ["disableClaudeAiConnectors", "strictMcpConfig"] as const) {
+          const flag = v[key];
+          if (flag === undefined) continue;
+          if (typeof flag !== "boolean") throw new Error(`${key} must be true or false`);
+          ctx.storage.kv.set(key, flag);
+        }
       },
     },
     { key: "valet-claudecode" },

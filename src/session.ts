@@ -1,5 +1,18 @@
-import type { Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentEvent, AgentOpenOptions, AgentSession, Logger, ModelContent } from "@valethq/sdk";
+import type {
+  HookCallback,
+  Options,
+  Query,
+  SDKMessage,
+  SDKUserMessage,
+} from "@anthropic-ai/claude-agent-sdk";
+import type {
+  AgentEvent,
+  AgentSession,
+  Logger,
+  McpServerEntry,
+  ModelContent,
+  ToolSurface,
+} from "@valethq/sdk";
 import { cacheStats, claudeEnv } from "./cache";
 import { InputQueue } from "./channel";
 import type { ClaudeCodeConfig, Effort, PermissionMode } from "./config";
@@ -7,14 +20,20 @@ import { mapMessage, mapResult, newTurnState } from "./events";
 import { resolveModel } from "./models";
 import type { SdkDeps } from "./sdk";
 
+/** Tool names of valet's MCP server ("valet", see provider.ts) as Claude Code reports them. */
+const VALET_TOOL_PREFIX = "mcp__valet__";
+
 export interface SessionInit {
   deps: SdkDeps;
   id: string;
   cwd: string;
   model: string;
-  mcpServers: AgentOpenOptions["mcpServers"];
+  mcpServers: McpServerEntry[];
+  tools: ToolSurface;
   reseeded: boolean;
   cfg(): ClaudeCodeConfig;
+  /** Connector and MCP-scope flags, read at each child start so the settings panel applies without a restart. */
+  flags(): { disableClaudeAiConnectors: boolean; strictMcpConfig: boolean };
   mode(): PermissionMode;
   log: Logger;
   blobPath(id: string): string;
@@ -25,7 +44,7 @@ type Block =
   | { type: "text"; text: string }
   | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
 
-export function mcpServerConfig(servers: AgentOpenOptions["mcpServers"]): NonNullable<Options["mcpServers"]> {
+export function mcpServerConfig(servers: McpServerEntry[]): NonNullable<Options["mcpServers"]> {
   return Object.fromEntries(
     [...servers]
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -57,6 +76,7 @@ export class ClaudeCodeSession implements AgentSession {
   private async options(input: InputQueue): Promise<{ prompt: InputQueue; options: Options }> {
     const { id, cwd, deps, log } = this.init;
     const cfg = this.init.cfg();
+    const flags = this.init.flags();
     const mode = this.init.mode();
     const resume = !!(await deps.getSessionInfo(id, { dir: cwd }).catch(() => undefined));
     const mcpServers = mcpServerConfig(this.init.mcpServers);
@@ -83,12 +103,49 @@ export class ClaudeCodeSession implements AgentSession {
           snapshot: true,
         },
         ...(Object.keys(mcpServers).length && { mcpServers }),
+        strictMcpConfig: flags.strictMcpConfig,
+        ...(flags.disableClaudeAiConnectors && { settings: { disableClaudeAiConnectors: true } }),
+        hooks: { PreToolUse: [{ hooks: [this.preToolUse] }] },
         env: claudeEnv(cfg),
         ...(cfg.pathToClaudeCodeExecutable && { pathToClaudeCodeExecutable: cfg.pathToClaudeCodeExecutable }),
         stderr: (line) => log.debug("claude stderr", { line: line.trimEnd() }),
       },
     };
   }
+
+  /** Runs valet's `tool.call` gate before each built-in tool. Valet's own MCP tools are gated in ToolSurface.call. */
+  private readonly preToolUse: HookCallback = async (input) => {
+    if (input.hook_event_name !== "PreToolUse" || input.tool_name.startsWith(VALET_TOOL_PREFIX)) return {};
+    const verdict = await this.init.tools.authorize(input.tool_name, input.tool_input, {
+      callId: input.tool_use_id,
+    });
+    if ("denied" in verdict) {
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason: verdict.denied,
+        },
+      };
+    }
+    if (JSON.stringify(verdict.input) === JSON.stringify(input.tool_input)) return {};
+    if (typeof verdict.input !== "object" || verdict.input === null || Array.isArray(verdict.input)) {
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason: "a policy hook rewrote the input to a non-object",
+        },
+      };
+    }
+    return {
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        updatedInput: verdict.input as Record<string, unknown>,
+      },
+    };
+  };
 
   private async ensure(): Promise<Query> {
     if (this.query) return this.query;

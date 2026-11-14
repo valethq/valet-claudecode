@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentProvider, PluginContext } from "@valethq/sdk";
+import type { AgentEvent, AgentProvider, PluginContext, ToolSurface } from "@valethq/sdk";
 import type { ClaudeCodeConfig } from "../src/config";
 import { createProvider } from "../src/provider";
 import type { SdkDeps } from "../src/sdk";
@@ -11,6 +11,11 @@ export function fakeCtx(config: ClaudeCodeConfig, deps: SdkDeps, blobs: Record<s
     logs.push({ level, msg, data });
   const ctx = {
     config,
+    plugin: { version: "0.1.0" },
+    http: {
+      route: () => ({ dispose() {} }),
+      url: (path: string) => `http://127.0.0.1:7437/plugins/valet-claudecode${path}`,
+    },
     log: { debug: logger("debug"), info: logger("info"), warn: logger("warn"), error: logger("error") },
     storage: {
       kv: {
@@ -50,12 +55,18 @@ export const input = (t: string, preamble?: string) => ({
   ...(preamble && { preamble }),
 });
 
+export const noTools: ToolSurface = {
+  list: () => [],
+  call: async () => ({ content: [] }),
+  authorize: async (_name, input) => ({ input }),
+};
+
 export const open = (h: ReturnType<typeof fakeCtx>, extra: Record<string, unknown> = {}) =>
   h.provider.open({
     sessionId: "s1",
     cwd: "/tmp",
     model: "claude-opus-5-5-high",
-    mcpServers: [],
+    tools: noTools,
     signal: new AbortController().signal,
     ...extra,
   });

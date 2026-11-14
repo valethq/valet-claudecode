@@ -59,8 +59,8 @@ test("mcpServerConfig is sorted by name", () => {
   expect(
     Object.keys(
       mcpServerConfig([
-        { name: "b", url: "u" },
-        { name: "a", url: "u" },
+        { name: "b", url: "u", headers: {} },
+        { name: "a", url: "u", headers: {} },
       ]),
     ),
   ).toEqual(["a", "b"]);

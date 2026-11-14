@@ -18,12 +18,7 @@ afterEach(async () => {
 test("open: new session, cache-stable options", async () => {
   const { deps, calls } = fakeSdk(pong);
   h = fakeCtx({ denyTools: ["Bash"], promptCacheTtl: "5m", appendSystemPrompt: "You are Helper." }, deps);
-  const s = await open(h, {
-    mcpServers: [
-      { name: "zeta", url: "http://z", headers: { authorization: "Bearer t" } },
-      { name: "alpha", url: "http://a" },
-    ],
-  });
+  const s = await open(h);
   expect(s.resumeId).toMatch(/^[0-9a-f-]{36}$/);
   expect(h.state[`s1:claude-code`]).toEqual({ resumeId: s.resumeId });
   await collect(s.prompt(input("hi"), ac()));
@@ -55,11 +50,11 @@ test("open: new session, cache-stable options", async () => {
     excludeDynamicSections: true,
     snapshot: true,
   });
-  expect(Object.keys(o.mcpServers)).toEqual(["alpha", "zeta"]);
-  expect(o.mcpServers.zeta).toEqual({
+  expect(Object.keys(o.mcpServers)).toEqual(["valet"]);
+  expect(o.mcpServers.valet).toEqual({
     type: "http",
-    url: "http://z",
-    headers: { authorization: "Bearer t" },
+    url: "http://127.0.0.1:7437/plugins/valet-claudecode/mcp/s1",
+    headers: { authorization: expect.stringMatching(/^Bearer [0-9a-f-]{36}$/) },
   });
   expect(o.env.CLAUDE_CODE_PROMPT_CACHE_TTL).toBe("5m");
 });
@@ -367,4 +362,22 @@ test("utility rejects on an error result", async () => {
   });
   h = fakeCtx({}, deps);
   await expect(h.provider.utility?.complete({ system: "s", prompt: "p" }, ac())).rejects.toThrow("boom");
+});
+
+test("connector and MCP flags reach the child: defaults on, panel overrides apply at the next start", async () => {
+  const { deps, calls } = fakeSdk(pong);
+  h = fakeCtx({}, deps);
+  const s = await open(h);
+  await collect(s.prompt(input("hi"), ac()));
+  const first = calls[0]?.options as { settings?: unknown; strictMcpConfig?: boolean };
+  expect(first.settings).toEqual({ disableClaudeAiConnectors: true });
+  expect(first.strictMcpConfig).toBe(true);
+
+  h.kv.set("disableClaudeAiConnectors", false);
+  h.kv.set("strictMcpConfig", false);
+  const s2 = await open(h, { sessionId: "s2" });
+  await collect(s2.prompt(input("hi"), ac()));
+  const second = calls[1]?.options as { settings?: unknown; strictMcpConfig?: boolean };
+  expect(second.settings).toBeUndefined();
+  expect(second.strictMcpConfig).toBe(false);
 });

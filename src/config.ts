@@ -27,6 +27,10 @@ export interface ClaudeCodeConfig {
   subagentPromptCacheTtl?: "5m" | "1h";
   /** Close the idle `claude` child after this long; the next prompt resumes it. 0 disables. Default 15 min. */
   idleCloseMs?: number;
+  /** Hide claude.ai account connectors (Gmail, GitHub, ...) from sessions. Default true: valet's tools only. */
+  disableClaudeAiConnectors?: boolean;
+  /** Load only the MCP servers valet passes, ignoring project .mcp.json, user settings and plugins. Default true. */
+  strictMcpConfig?: boolean;
   pathToClaudeCodeExecutable?: string;
   /** Model for small side jobs such as session naming. Empty string turns them off. */
   utilityModel?: string;
