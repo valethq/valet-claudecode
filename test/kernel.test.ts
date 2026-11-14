@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const CLI = "/home/user/valet/valet-core/packages/core/src/cli.ts";
+const CORE = process.env.VALET_CORE_DIR ?? join(import.meta.dir, "..", "..", "valet-core");
+const CLI = join(CORE, "packages/core/src/cli.ts");
 const ROOT = join(import.meta.dir, "..");
 let proc: Bun.Subprocess | undefined;
 afterAll(() => proc?.kill("SIGKILL"));
