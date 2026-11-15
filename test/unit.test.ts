@@ -7,10 +7,11 @@ import { mcpServerConfig } from "../src/session";
 import { leakedTools } from "../src/tools";
 
 test("claudeEnv sets TTLs only when configured, and an explicit variable wins", () => {
-  const base = { PATH: "/bin" };
+  const base = { PATH: "/bin", MCP_TOOL_TIMEOUT: "1000" };
   expect(claudeEnv({}, base)).toEqual(base);
   expect(claudeEnv({ promptCacheTtl: "5m", subagentPromptCacheTtl: "1h" }, base)).toEqual({
     PATH: "/bin",
+    MCP_TOOL_TIMEOUT: "1000",
     CLAUDE_CODE_PROMPT_CACHE_TTL: "5m",
     CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL: "1h",
   });
@@ -18,6 +19,11 @@ test("claudeEnv sets TTLs only when configured, and an explicit variable wins", 
     claudeEnv({ promptCacheTtl: "5m" }, { ...base, CLAUDE_CODE_PROMPT_CACHE_TTL: "1h" })
       .CLAUDE_CODE_PROMPT_CACHE_TTL,
   ).toBe("1h");
+});
+
+test("claudeEnv lifts Claude Code's 60s MCP tool timeout", () => {
+  expect(claudeEnv({}, {}).MCP_TOOL_TIMEOUT).toBe(String(24 * 3_600_000));
+  expect(claudeEnv({ mcpToolTimeoutMs: 5000 }, {}).MCP_TOOL_TIMEOUT).toBe("5000");
 });
 
 test("cacheStats and contextTokens", () => {

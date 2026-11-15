@@ -2,12 +2,18 @@ import type { ClaudeCodeConfig } from "./config";
 
 type Env = Record<string, string | undefined>;
 
+/** valet's tools bound their own waits (exec yields by 10 min), so the MCP client shouldn't cut them at 60s. */
+export const DEFAULT_MCP_TOOL_TIMEOUT_MS = 24 * 3_600_000;
+
 /**
  * Agent SDK turns are "main conversation" requests, so Claude Code gives them the 1h TTL on a
  * subscription. Only touch the TTL when configured; an explicit variable in the host env wins.
+ * MCP_TOOL_TIMEOUT is always set: Claude Code's MCP client otherwise aborts a tool call after 60s.
  */
 export function claudeEnv(cfg: ClaudeCodeConfig, base: Env = process.env): Env {
   const env: Env = { ...base };
+  if (env.MCP_TOOL_TIMEOUT === undefined)
+    env.MCP_TOOL_TIMEOUT = String(cfg.mcpToolTimeoutMs ?? DEFAULT_MCP_TOOL_TIMEOUT_MS);
   if (cfg.promptCacheTtl && env.CLAUDE_CODE_PROMPT_CACHE_TTL === undefined)
     env.CLAUDE_CODE_PROMPT_CACHE_TTL = cfg.promptCacheTtl;
   if (cfg.subagentPromptCacheTtl && env.CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL === undefined)

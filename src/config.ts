@@ -40,6 +40,8 @@ export interface ClaudeCodeConfig {
   promptCacheTtl?: "5m" | "1h";
   /** CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL for Claude Code's own subagents. Unset = default (5m). */
   subagentPromptCacheTtl?: "5m" | "1h";
+  /** MCP_TOOL_TIMEOUT for valet's MCP tools, in ms. Claude Code's own default is 60s. Default 24h. */
+  mcpToolTimeoutMs?: number;
   /** Close the idle `claude` child after this long; the next prompt resumes it. 0 disables. Default 15 min. */
   idleCloseMs?: number;
   /** Hide claude.ai account connectors (Gmail, GitHub, ...) from sessions. Default true: valet's tools only. */

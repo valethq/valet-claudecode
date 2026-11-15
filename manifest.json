@@ -28,6 +28,7 @@
       "promptCacheTtl": { "type": "string", "enum": ["5m", "1h"] },
       "subagentPromptCacheTtl": { "type": "string", "enum": ["5m", "1h"] },
       "idleCloseMs": { "type": "number" },
+      "mcpToolTimeoutMs": { "type": "number" },
       "pathToClaudeCodeExecutable": { "type": "string" },
       "models": {
         "type": "array",
