@@ -200,6 +200,18 @@ export class ClaudeCodeSession implements AgentSession {
     this.idle.unref?.();
   }
 
+  /**
+   * Claude Code 2.1.323 sends MCP tools inline once a child has made its first request, and a compaction drops that
+   * declaration without re-sending it, so later turns in the same child reach the model with no valet tools. A fresh
+   * child resumes the session and declares them again.
+   */
+  private restartAfterCompaction(): void {
+    this.init.log.info("closing claude code child after compaction; the next prompt resumes it", {
+      session: this.init.id,
+    });
+    this.drop();
+  }
+
   async setModel(next: string): Promise<void> {
     const { model, effort } = resolveModel(next);
     const modelChanged = model !== this.model;
@@ -280,6 +292,7 @@ export class ClaudeCodeSession implements AgentSession {
       return;
     }
     const state = newTurnState(this.init.log, this.lastContext);
+    let compacted = false;
     const message = {
       type: "user",
       message: { role: "user", content },
@@ -328,8 +341,10 @@ export class ClaudeCodeSession implements AgentSession {
             cache: cacheStats(m.usage),
           });
           yield* mapResult(m, state, signal.aborted);
+          if (compacted) this.restartAfterCompaction();
           return;
         }
+        if (m.type === "system" && m.subtype === "compact_boundary") compacted = true;
         yield* mapMessage(m, state, () => signal.aborted);
       }
     } finally {

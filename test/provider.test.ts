@@ -320,6 +320,45 @@ test("/compact runs as a turn and reports the compaction start and end", async (
   expect(events.at(-1)).toEqual({ type: "finish", reason: "stop" });
 });
 
+test("a compaction closes the child so the next prompt resumes in a fresh one", async () => {
+  const script = async function* (userText: string) {
+    if (userText === "/compact") {
+      yield {
+        type: "system",
+        subtype: "compact_boundary",
+        compact_metadata: { trigger: "manual", pre_tokens: 1000, post_tokens: 200 },
+      } as never;
+      yield result();
+      return;
+    }
+    yield* pong();
+  };
+  const { deps, calls } = fakeSdk(script);
+  h = fakeCtx({}, deps);
+  const s = await open(h);
+  await collect(s.prompt(input("hi"), ac()));
+  if (!s.compact) throw new Error("claude code session should support compact");
+  const events = await collect(s.compact(undefined, ac()));
+  expect(events.at(-1)).toEqual({ type: "finish", reason: "stop" });
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.closed).toBe(true);
+  expect(h.logs.some((l) => l.msg.startsWith("closing claude code child after compaction"))).toBe(true);
+  await collect(s.prompt(input("again"), ac()));
+  expect(calls).toHaveLength(2);
+  expect(calls[1]?.options.resume).toBe(s.resumeId);
+  expect(calls[1]?.prompts).toEqual(["again"]);
+});
+
+test("a turn without a compaction keeps the child", async () => {
+  const { deps, calls } = fakeSdk(pong);
+  h = fakeCtx({}, deps);
+  const s = await open(h);
+  await collect(s.prompt(input("hi"), ac()));
+  await collect(s.prompt(input("again"), ac()));
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.closed).toBe(false);
+});
+
 test("utility runs one tool-free turn on the Utility model", async () => {
   const { deps, calls } = fakeSdk(async function* () {
     yield result({ result: "  Fixing the Caddy config \n" });
