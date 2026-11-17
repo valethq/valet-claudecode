@@ -50,6 +50,10 @@ export function createProvider(
         mcpServers: [mcp],
         tools: opts.tools,
         reseeded: opts.resumeId !== undefined && id !== opts.resumeId,
+        preamble: {
+          get: () => ctx.storage.kv.get<string>(`preamble:${id}`),
+          set: (text) => ctx.storage.kv.set(`preamble:${id}`, text),
+        },
         cfg: () => ctx.config ?? {},
         flags: () => ({
           hideBuiltinTools: hideBuiltinTools(ctx),

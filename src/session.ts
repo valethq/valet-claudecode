@@ -32,6 +32,8 @@ export interface SessionInit {
   mcpServers: McpServerEntry[];
   tools: ToolSurface;
   reseeded: boolean;
+  /** valet's persona preamble for this session, kept so every child launch appends the same system prompt. */
+  preamble: { get(): string | undefined; set(text: string): void };
   cfg(): ClaudeCodeConfig;
   /** Tool-scope flags, read at each child start so the settings panel applies without a restart. */
   flags(): { hideBuiltinTools: boolean; disableClaudeAiConnectors: boolean; strictMcpConfig: boolean };
@@ -98,6 +100,7 @@ export class ClaudeCodeSession implements AgentSession {
     const mcpServers = mcpServerConfig(this.init.mcpServers, !cfg.deferValetTools);
     this.deny = cfg.denyTools;
     const tools = flags.hideBuiltinTools ? [] : cfg.tools;
+    const append = [cfg.appendSystemPrompt, this.init.preamble.get()].filter((t) => !!t).join("\n\n");
     return {
       prompt: input,
       options: {
@@ -108,7 +111,7 @@ export class ClaudeCodeSession implements AgentSession {
         // newer models default to omitting thinking text; "summarized" streams the reasoning summary as thinking_delta
         thinking: { type: "adaptive", display: "summarized" },
         includePartialMessages: true,
-        settingSources: cfg.settingSources ?? ["project", "local"],
+        settingSources: cfg.settingSources ?? [],
         permissionMode: mode,
         ...(mode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
         ...(tools && { tools }),
@@ -118,7 +121,7 @@ export class ClaudeCodeSession implements AgentSession {
         systemPrompt: {
           type: "preset",
           preset: "claude_code",
-          ...(cfg.appendSystemPrompt && { append: cfg.appendSystemPrompt }),
+          ...(append && { append }),
           excludeDynamicSections: true,
           snapshot: true,
         },
@@ -239,13 +242,9 @@ export class ClaudeCodeSession implements AgentSession {
     };
   }
 
-  private async blocks(input: { content: ModelContent[]; preamble?: string }): Promise<Block[]> {
-    const head = (input.preamble?.split(/\n(?=## )/) ?? []).filter((t) => !!t);
-    const content = await Promise.all(input.content.map((c) => this.contentBlock(c)));
-    return [
-      ...head.map((text): Block => ({ type: "text", text })),
-      ...content.filter((b): b is Block => b !== undefined),
-    ];
+  private async blocks(content: ModelContent[]): Promise<Block[]> {
+    const blocks = await Promise.all(content.map((c) => this.contentBlock(c)));
+    return blocks.filter((b): b is Block => b !== undefined);
   }
 
   /** An abandoned turn leaves its messages in the Query; consume them so they don't bleed into the next turn. */
@@ -263,9 +262,11 @@ export class ClaudeCodeSession implements AgentSession {
     input: { content: ModelContent[]; preamble?: string },
     signal: AbortSignal,
   ): AsyncIterable<AgentEvent> {
+    // The preamble arrives with a session's first prompt, before its child starts, so it lands in the system prompt.
+    if (input.preamble) this.init.preamble.set(input.preamble);
     let content: Block[];
     try {
-      content = await this.blocks(input);
+      content = await this.blocks(input.content);
     } catch (e) {
       this.drop();
       yield { type: "finish", reason: "error", error: (e as Error).message };

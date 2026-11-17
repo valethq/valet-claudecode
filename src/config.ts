@@ -34,7 +34,7 @@ export interface ClaudeCodeConfig {
   deferValetTools?: boolean;
   /** Appended to the claude_code system prompt. Static per plugin config: it is part of the cached prefix. */
   appendSystemPrompt?: string;
-  /** Which Claude Code settings files to load. Default ["project", "local"] keeps the prefix deterministic. */
+  /** Which Claude Code settings files (and CLAUDE.md / AGENTS.md) to load. Default none: valet supplies the persona. */
   settingSources?: ("user" | "project" | "local")[];
   /** CLAUDE_CODE_PROMPT_CACHE_TTL for main-conversation requests. Unset = Anthropic's default (1h on subscription). */
   promptCacheTtl?: "5m" | "1h";

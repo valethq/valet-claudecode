@@ -40,7 +40,7 @@ test("open: new session, cache-stable options", async () => {
   expect(o.model).toBe("claude-opus-5-5");
   expect(o.effort).toBe("high");
   expect(o.permissionMode).toBe("acceptEdits");
-  expect(o.settingSources).toEqual(["project", "local"]);
+  expect(o.settingSources).toEqual([]);
   expect(o.disallowedTools).toEqual(["Bash"]);
   expect(o.includePartialMessages).toBe(true);
   expect(o.systemPrompt).toEqual({
@@ -198,12 +198,22 @@ test("resume: known session resumes, unknown session is reseeded", async () => {
   expect(h.state["s1:claude-code"]).toEqual({ resumeId: b.resumeId });
 });
 
-test("preamble sections go first, as separate text blocks", async () => {
+test("preamble goes into the system prompt after appendSystemPrompt, not the user message", async () => {
   const { deps, calls } = fakeSdk(pong);
-  h = fakeCtx({}, deps);
+  h = fakeCtx({ appendSystemPrompt: "You are Helper.", idleCloseMs: 20 }, deps);
   const s = await open(h);
-  await collect(s.prompt(input("hi", "## Persona\nHelper\n## Rules\nbe nice"), ac()));
-  expect(calls[0]?.prompts).toEqual(["## Persona\nHelper|## Rules\nbe nice|hi"]);
+  await collect(s.prompt(input("hi", "# Persona\n## Rules\nbe nice"), ac()));
+  expect(calls[0]?.prompts).toEqual(["hi"]);
+  const append = (o: Record<string, unknown> | undefined) =>
+    (o?.systemPrompt as { append?: string } | undefined)?.append;
+  expect(append(calls[0]?.options)).toBe("You are Helper.\n\n# Persona\n## Rules\nbe nice");
+  await Bun.sleep(80);
+  await collect(s.prompt(input("again"), ac()));
+  expect(calls[1]?.options.resume).toBe(s.resumeId);
+  expect(append(calls[1]?.options)).toBe(append(calls[0]?.options));
+  const reopened = await open(h, { resumeId: s.resumeId });
+  await collect(reopened.prompt(input("after restart"), ac()));
+  expect(append(calls[2]?.options)).toBe(append(calls[0]?.options));
 });
 
 test("setModel only touches the Query when something changed", async () => {
