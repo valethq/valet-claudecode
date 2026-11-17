@@ -32,6 +32,12 @@ export function strictMcpConfig(ctx: PluginContext<ClaudeCodeConfig>): boolean {
   return ctx.storage.kv.get<boolean>("strictMcpConfig") ?? ctx.config?.strictMcpConfig ?? true;
 }
 
+/** Panel value wins over config.json. Default 80: "approaching limit" warnings stay quiet until then. */
+export function minRateLimitNoticePercent(ctx: PluginContext<ClaudeCodeConfig>): number {
+  const v = ctx.storage.kv.get<number>("minRateLimitNoticePercent") ?? ctx.config?.minRateLimitNoticePercent;
+  return typeof v === "number" && v >= 0 && v <= 100 ? v : 80;
+}
+
 export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>, deps: SdkDeps): void {
   const usage = createUsage(ctx, deps);
   ctx.scopes.define({ name: "settings", version: 1, cardinality: "many" });
@@ -59,6 +65,14 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>, deps: Sdk
             title: "Utility model",
             description: "Model for small side jobs such as naming sessions. Empty turns them off.",
           },
+          minRateLimitNoticePercent: {
+            type: "number",
+            title: "Usage warning threshold (%)",
+            description:
+              'Only show "approaching limit" warnings once usage is at or above this percent. Hitting a limit is always shown.',
+            minimum: 0,
+            maximum: 100,
+          },
           hideBuiltinTools: {
             type: "boolean",
             title: "Hide built-in tools",
@@ -82,6 +96,7 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>, deps: Sdk
       get: () => ({
         permissionMode: permissionMode(ctx),
         utilityModel: utilityModel(ctx) ?? "",
+        minRateLimitNoticePercent: minRateLimitNoticePercent(ctx),
         hideBuiltinTools: hideBuiltinTools(ctx),
         disableClaudeAiConnectors: disableClaudeAiConnectors(ctx),
         strictMcpConfig: strictMcpConfig(ctx),
@@ -92,6 +107,10 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>, deps: Sdk
           throw new Error(`permissionMode must be one of: ${MODES.join(", ")}`);
         if (v.utilityModel !== undefined && typeof v.utilityModel !== "string")
           throw new Error("utilityModel must be a string");
+        const min = v.minRateLimitNoticePercent;
+        if (min !== undefined && (typeof min !== "number" || !(min >= 0 && min <= 100)))
+          throw new Error("minRateLimitNoticePercent must be a number from 0 to 100");
+        if (min !== undefined) ctx.storage.kv.set("minRateLimitNoticePercent", min);
         if (mode !== undefined) ctx.storage.kv.set("permissionMode", mode);
         if (typeof v.utilityModel === "string") ctx.storage.kv.set("utilityModel", v.utilityModel);
         for (const key of ["hideBuiltinTools", "disableClaudeAiConnectors", "strictMcpConfig"] as const) {

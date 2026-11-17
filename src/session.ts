@@ -36,6 +36,7 @@ export interface SessionInit {
   /** Tool-scope flags, read at each child start so the settings panel applies without a restart. */
   flags(): { hideBuiltinTools: boolean; disableClaudeAiConnectors: boolean; strictMcpConfig: boolean };
   mode(): PermissionMode;
+  minRateLimitNoticePercent(): number;
   log: Logger;
   blobPath(id: string): string;
   onClose(): void;
@@ -291,7 +292,7 @@ export class ClaudeCodeSession implements AgentSession {
       yield { type: "finish", reason: "error", error: (e as Error).message };
       return;
     }
-    const state = newTurnState(this.init.log, this.lastContext);
+    const state = newTurnState(this.init.log, this.lastContext, this.init.minRateLimitNoticePercent());
     let compacted = false;
     const message = {
       type: "user",

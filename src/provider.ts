@@ -4,7 +4,13 @@ import type { ClaudeCodeConfig } from "./config";
 import { modelLister } from "./models";
 import { realSdk, type SdkDeps } from "./sdk";
 import { ClaudeCodeSession } from "./session";
-import { disableClaudeAiConnectors, hideBuiltinTools, permissionMode, strictMcpConfig } from "./settings";
+import {
+  disableClaudeAiConnectors,
+  hideBuiltinTools,
+  minRateLimitNoticePercent,
+  permissionMode,
+  strictMcpConfig,
+} from "./settings";
 import { createUtility } from "./utility";
 
 export const PROVIDER_KEY = "claude-code";
@@ -51,6 +57,7 @@ export function createProvider(
           strictMcpConfig: strictMcpConfig(ctx),
         }),
         mode: () => permissionMode(ctx),
+        minRateLimitNoticePercent: () => minRateLimitNoticePercent(ctx),
         log: ctx.log,
         blobPath: (blobId) => ctx.store.blobs.path(blobId),
         onClose: () => {

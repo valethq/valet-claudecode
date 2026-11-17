@@ -48,6 +48,8 @@ export interface ClaudeCodeConfig {
   disableClaudeAiConnectors?: boolean;
   /** Load only the MCP servers valet passes, ignoring project .mcp.json, user settings and plugins. Default true. */
   strictMcpConfig?: boolean;
+  /** Hide "approaching limit" warnings below this percent used (0-100). Hard-limit errors always show. Also in the settings panel. Default 80. */
+  minRateLimitNoticePercent?: number;
   pathToClaudeCodeExecutable?: string;
   /** Model for small side jobs such as session naming. Empty string turns them off. */
   utilityModel?: string;

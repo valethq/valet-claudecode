@@ -142,6 +142,20 @@ test("compaction becomes a marker event; retries and rate limits become notices"
       () => false,
     ),
   ).toEqual([{ type: "notice", level: "error", text: "Claude hit its session limit." }]);
+  const warn = (utilization: number, min: number) =>
+    mapMessage(
+      sys({
+        type: "rate_limit_event",
+        rate_limit_info: { status: "allowed_warning", rateLimitType: "seven_day", utilization },
+      }),
+      newTurnState(undefined, undefined, min),
+      () => false,
+    );
+  expect(warn(0.25, 80)).toEqual([]);
+  expect(warn(0.8, 80)).toEqual([
+    { type: "notice", level: "warning", text: "Approaching Claude's weekly limit (80% used)" },
+  ]);
+  expect(warn(0.25, 0)).toHaveLength(1);
   const inSeconds = (s: number) => Math.floor(Date.now() / 1000) + s;
   const rejected = (rateLimitType: string, resetsAt: number) =>
     mapMessage(

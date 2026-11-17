@@ -4,6 +4,7 @@ import type { ClaudeCodeConfig } from "../src/config";
 import {
   disableClaudeAiConnectors,
   hideBuiltinTools,
+  minRateLimitNoticePercent,
   registerSettings,
   strictMcpConfig,
 } from "../src/settings";
@@ -74,6 +75,19 @@ describe("connector and MCP flags", () => {
   test("the panel rejects non-boolean values", () => {
     const panel = panelOf(ctxWith({}));
     expect(() => panel.set({ strictMcpConfig: "yes" })).toThrow("strictMcpConfig must be true or false");
+  });
+});
+
+describe("rate-limit notice threshold", () => {
+  test("defaults to 80, config.json sets it, the panel overrides and validates it", async () => {
+    expect(minRateLimitNoticePercent(ctxWith({}))).toBe(80);
+    const ctx = ctxWith({ minRateLimitNoticePercent: 50 });
+    expect(minRateLimitNoticePercent(ctx)).toBe(50);
+    const panel = panelOf(ctx);
+    await panel.set({ minRateLimitNoticePercent: 90 });
+    expect(minRateLimitNoticePercent(ctx)).toBe(90);
+    expect(await panel.get()).toMatchObject({ minRateLimitNoticePercent: 90 });
+    expect(() => panel.set({ minRateLimitNoticePercent: 101 })).toThrow("0 to 100");
   });
 });
 

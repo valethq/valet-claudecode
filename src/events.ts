@@ -11,10 +11,12 @@ export interface TurnState {
   currentMessage?: string;
   contextTokens?: number;
   log?: Logger;
+  /** Rate-limit warnings below this percent used are dropped. */
+  minRateLimitPercent: number;
 }
 
-export function newTurnState(log?: Logger, contextTokens?: number): TurnState {
-  return { streamedText: new Set(), streamedThinking: new Set(), contextTokens, log };
+export function newTurnState(log?: Logger, contextTokens?: number, minRateLimitPercent = 0): TurnState {
+  return { streamedText: new Set(), streamedThinking: new Set(), contextTokens, log, minRateLimitPercent };
 }
 
 function titleOf(input: Obj): string | undefined {
@@ -159,6 +161,7 @@ export function mapMessage(m: SDKMessage, st: TurnState, aborted: () => boolean)
         const reset = resetsAt === undefined ? "" : ` It resets in ${untilReset(resetsAt)}.`;
         return [{ type: "notice", level: "error", text: `Claude hit its ${scope} limit.${reset}` }];
       }
+      if (utilization !== undefined && utilization * 100 < st.minRateLimitPercent) return [];
       const pct = utilization === undefined ? "" : ` (${Math.round(utilization * 100)}% used)`;
       return [{ type: "notice", level: "warning", text: `Approaching Claude's ${scope} limit${pct}` }];
     }
