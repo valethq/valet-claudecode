@@ -25,10 +25,12 @@ export function createProvider(
     version: ctx.plugin.version,
     readBlob: (blobId) => Bun.file(ctx.store.blobs.path(blobId)).bytes(),
   });
-  const provider: AgentProvider = {
+  // `& { icon }` until @valethq/sdk 0.3.0 (ProviderBase.icon) is published.
+  const provider: AgentProvider & { readonly icon: string } = {
     kind: "agent",
     id: PROVIDER_KEY,
     label: "Claude Code",
+    icon: "claude",
     listModels: modelLister(() => ctx.config),
     utility: createUtility(ctx, deps),
     async open(opts): Promise<AgentSession> {

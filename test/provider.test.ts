@@ -504,3 +504,8 @@ test("hideBuiltinTools sends tools: [] and beats a configured tools list; the pa
   const second = calls[1]?.options as { tools?: string[] };
   expect(second.tools).toEqual(["Read"]);
 });
+
+test("the provider names the Claude logo for UIs", () => {
+  h = fakeCtx({}, fakeSdk(pong).deps);
+  expect((h.provider as { icon?: string }).icon).toBe("claude");
+});
