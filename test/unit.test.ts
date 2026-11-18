@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { cacheStats, claudeEnv, contextTokens } from "../src/cache";
 import { mapMessage, newTurnState } from "../src/events";
 import { DEFAULT_MODELS } from "../src/config";
-import { resolveModel, toModelInfos } from "../src/models";
+import { modelLister, resolveModel, toModelInfos } from "../src/models";
 import { mcpServerConfig } from "../src/session";
 import { leakedTools } from "../src/tools";
 
@@ -194,5 +194,17 @@ test("interrupted tool results map to cancelled when the turn was aborted", () =
   });
   expect(mapMessage(m, newTurnState(), () => true)).toEqual([
     { type: "tool-end", callId: "t", status: "cancelled", output: "[interrupted]" },
+  ]);
+});
+
+test("modelLister appends custom models and skips ones that duplicate a listed id", async () => {
+  const list = await modelLister(
+    () => ({ models: [{ id: "a", name: "A" }] }),
+    () => [{ id: "a", name: "Dup" }, { id: "mine", name: "Mine" }, { id: "bare" }],
+  )();
+  expect(list.map((m) => [m.id, m.name])).toEqual([
+    ["a", "A"],
+    ["mine", "Mine"],
+    ["bare", "bare"],
   ]);
 });

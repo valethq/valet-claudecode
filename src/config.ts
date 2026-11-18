@@ -13,6 +13,12 @@ export interface ModelConfig {
   efforts?: Effort[];
 }
 
+/** A model the user adds by hand; `id` goes to the harness unchanged, `name` is the picker label. */
+export interface CustomModel {
+  id: string;
+  name?: string;
+}
+
 export interface ClaudeCodeConfig {
   permissionMode?: PermissionMode;
   /** Tools Claude Code may never use (hard deny), e.g. ["Bash"] to steer to valet-exec over MCP. */
@@ -54,6 +60,8 @@ export interface ClaudeCodeConfig {
   /** Model for small side jobs such as session naming. Empty string turns them off. */
   utilityModel?: string;
   models?: ModelConfig[];
+  /** Extra picker entries added to the model list. Also in the settings panel. */
+  customModels?: CustomModel[];
 }
 
 /** Every level the Claude 5 family reports as supported (SDK supportedModels()). */

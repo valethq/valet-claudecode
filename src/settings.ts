@@ -1,5 +1,11 @@
 import type { PluginContext } from "@valethq/sdk";
-import { type ClaudeCodeConfig, DEFAULT_UTILITY_MODEL, MODES, type PermissionMode } from "./config";
+import {
+  type ClaudeCodeConfig,
+  type CustomModel,
+  DEFAULT_UTILITY_MODEL,
+  MODES,
+  type PermissionMode,
+} from "./config";
 import type { SdkDeps } from "./sdk";
 import { createUsage } from "./usage";
 
@@ -38,6 +44,22 @@ export function minRateLimitNoticePercent(ctx: PluginContext<ClaudeCodeConfig>):
   return typeof v === "number" && v >= 0 && v <= 100 ? v : 80;
 }
 
+/** Panel value wins over config.json. Entries without an id are dropped. */
+export function customModels(ctx: PluginContext<ClaudeCodeConfig>): CustomModel[] {
+  const v = ctx.storage.kv.get<unknown>("customModels") ?? ctx.config?.customModels;
+  return Array.isArray(v)
+    ? v
+        .filter(isCustomModel)
+        .map(({ id, name }) => ({ id: id.trim(), ...(name?.trim() && { name: name.trim() }) }))
+    : [];
+}
+
+const isCustomModel = (m: unknown): m is CustomModel =>
+  typeof m === "object" &&
+  m !== null &&
+  typeof (m as CustomModel).id === "string" &&
+  (m as CustomModel).id.trim() !== "";
+
 export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>, deps: SdkDeps): void {
   const usage = createUsage(ctx, deps);
   ctx.scopes.define({ name: "settings", version: 1, cardinality: "many" });
@@ -64,6 +86,19 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>, deps: Sdk
             type: "string",
             title: "Utility model",
             description: "Model for small side jobs such as naming sessions. Empty turns them off.",
+          },
+          customModels: {
+            type: "array",
+            title: "Custom models",
+            description: "Extra models for the picker. The model name is sent to Claude Code as is.",
+            items: {
+              type: "object",
+              required: ["id"],
+              properties: {
+                id: { type: "string", title: "Model name" },
+                name: { type: "string", title: "Friendly name" },
+              },
+            },
           },
           minRateLimitNoticePercent: {
             type: "number",
@@ -96,6 +131,7 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>, deps: Sdk
       get: () => ({
         permissionMode: permissionMode(ctx),
         utilityModel: utilityModel(ctx) ?? "",
+        customModels: customModels(ctx),
         minRateLimitNoticePercent: minRateLimitNoticePercent(ctx),
         hideBuiltinTools: hideBuiltinTools(ctx),
         disableClaudeAiConnectors: disableClaudeAiConnectors(ctx),
@@ -110,6 +146,12 @@ export function registerSettings(ctx: PluginContext<ClaudeCodeConfig>, deps: Sdk
         const min = v.minRateLimitNoticePercent;
         if (min !== undefined && (typeof min !== "number" || !(min >= 0 && min <= 100)))
           throw new Error("minRateLimitNoticePercent must be a number from 0 to 100");
+        if (
+          v.customModels !== undefined &&
+          !(Array.isArray(v.customModels) && v.customModels.every(isCustomModel))
+        )
+          throw new Error("customModels entries need a model name");
+        if (v.customModels !== undefined) ctx.storage.kv.set("customModels", v.customModels);
         if (min !== undefined) ctx.storage.kv.set("minRateLimitNoticePercent", min);
         if (mode !== undefined) ctx.storage.kv.set("permissionMode", mode);
         if (typeof v.utilityModel === "string") ctx.storage.kv.set("utilityModel", v.utilityModel);

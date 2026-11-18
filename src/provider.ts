@@ -5,6 +5,7 @@ import { modelLister } from "./models";
 import { realSdk, type SdkDeps } from "./sdk";
 import { ClaudeCodeSession } from "./session";
 import {
+  customModels,
   disableClaudeAiConnectors,
   hideBuiltinTools,
   minRateLimitNoticePercent,
@@ -31,7 +32,10 @@ export function createProvider(
     id: PROVIDER_KEY,
     label: "Claude Code",
     icon: "claude",
-    listModels: modelLister(() => ctx.config),
+    listModels: modelLister(
+      () => ctx.config,
+      () => customModels(ctx),
+    ),
     utility: createUtility(ctx, deps),
     async open(opts): Promise<AgentSession> {
       const session = ctx.store.sessions.get(opts.sessionId);

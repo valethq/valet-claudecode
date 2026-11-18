@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { PluginContext, SettingsPanel } from "@valethq/sdk";
 import type { ClaudeCodeConfig } from "../src/config";
 import {
+  customModels,
   disableClaudeAiConnectors,
   hideBuiltinTools,
   minRateLimitNoticePercent,
@@ -123,4 +124,17 @@ describe("usage on the settings panel", () => {
     await panel?.actions?.refresh?.({});
     expect(typeof panel?.actions?.refresh).toBe("function");
   });
+});
+
+test("customModels round-trips through the panel and rejects entries without a model name", async () => {
+  const ctx = ctxWith({});
+  const panel = panelOf(ctx);
+  await panel.set({
+    customModels: [
+      { id: " my-model ", name: "Mine" },
+      { id: "bare", name: "" },
+    ],
+  });
+  expect(customModels(ctx)).toEqual([{ id: "my-model", name: "Mine" }, { id: "bare" }]);
+  expect(() => panel.set({ customModels: [{ id: "" }] })).toThrow("customModels");
 });

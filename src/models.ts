@@ -1,5 +1,12 @@
 import type { ModelInfo } from "@valethq/sdk";
-import { type ClaudeCodeConfig, DEFAULT_MODELS, EFFORTS, type Effort, type ModelConfig } from "./config";
+import {
+  type ClaudeCodeConfig,
+  type CustomModel,
+  DEFAULT_MODELS,
+  EFFORTS,
+  type Effort,
+  type ModelConfig,
+} from "./config";
 
 const EFFORT_SUFFIX = new RegExp(`-(${EFFORTS.join("|")})$`);
 
@@ -23,6 +30,16 @@ export function toModelInfos(m: ModelConfig): ModelInfo[] {
   return m.efforts.map((e) => ({ ...base, id: `${m.id}-${e}`, name: `${base.name} (${e})` }));
 }
 
-export function modelLister(cfg: () => ClaudeCodeConfig | undefined) {
-  return async (): Promise<ModelInfo[]> => (cfg()?.models ?? DEFAULT_MODELS).flatMap(toModelInfos);
+/** Custom models are appended; one that shares an id with a listed model is skipped. */
+export function modelLister(cfg: () => ClaudeCodeConfig | undefined, custom: () => CustomModel[] = () => []) {
+  return async (): Promise<ModelInfo[]> => {
+    const listed = (cfg()?.models ?? DEFAULT_MODELS).flatMap(toModelInfos);
+    const seen = new Set(listed.map((m) => m.id));
+    return [
+      ...listed,
+      ...custom()
+        .filter((m) => !seen.has(m.id))
+        .flatMap(toModelInfos),
+    ];
+  };
 }
