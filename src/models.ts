@@ -1,45 +1,31 @@
 import type { ModelInfo } from "@valethq/sdk";
-import {
-  type ClaudeCodeConfig,
-  type CustomModel,
-  DEFAULT_MODELS,
-  EFFORTS,
-  type Effort,
-  type ModelConfig,
-} from "./config";
+import { type ClaudeCodeConfig, DEFAULT_MODELS, EFFORTS, type Effort, type ModelConfig } from "./config";
 
 const EFFORT_SUFFIX = new RegExp(`-(${EFFORTS.join("|")})$`);
 
-/** "claude-opus-5-5-high" -> { model: "claude-opus-5-5", effort: "high" }. Ids without a suffix pass through. */
+/** For the utility model setting, which may name an effort: "claude-haiku-5-5-low" -> { model, effort: "low" }. */
 export function resolveModel(id: string): { model: string; effort?: Effort } {
   const effort = EFFORT_SUFFIX.exec(id)?.[1] as Effort | undefined;
   return effort ? { model: id.replace(EFFORT_SUFFIX, ""), effort } : { model: id };
 }
 
-/** One picker entry per declared effort: "<id>-<effort>". Without declared efforts, just the bare model. */
-export function toModelInfos(m: ModelConfig): ModelInfo[] {
-  const base: ModelInfo = {
+/** An effort Claude Code takes, or undefined for anything else. */
+export const asEffort = (v: string | undefined): Effort | undefined =>
+  v !== undefined && (EFFORTS as readonly string[]).includes(v) ? (v as Effort) : undefined;
+
+export function toModelInfo(m: ModelConfig): ModelInfo {
+  return {
     id: m.id,
     name: m.name ?? m.id,
     contextWindow: m.contextWindow ?? 200_000,
     maxOutputTokens: m.maxOutputTokens ?? 64_000,
     input: ["text", "image"],
     reasoning: true,
+    ...(m.efforts?.length ? { efforts: m.efforts } : {}),
+    ...(m.fast ? { fast: true } : {}),
   };
-  if (!m.efforts?.length) return [base];
-  return m.efforts.map((e) => ({ ...base, id: `${m.id}-${e}`, name: `${base.name} (${e})` }));
 }
 
-/** Custom models are appended; one that shares an id with a listed model is skipped. */
-export function modelLister(cfg: () => ClaudeCodeConfig | undefined, custom: () => CustomModel[] = () => []) {
-  return async (): Promise<ModelInfo[]> => {
-    const listed = (cfg()?.models ?? DEFAULT_MODELS).flatMap(toModelInfos);
-    const seen = new Set(listed.map((m) => m.id));
-    return [
-      ...listed,
-      ...custom()
-        .filter((m) => !seen.has(m.id))
-        .flatMap(toModelInfos),
-    ];
-  };
+export function modelLister(cfg: () => ClaudeCodeConfig | undefined) {
+  return async (): Promise<ModelInfo[]> => (cfg()?.models ?? DEFAULT_MODELS).map(toModelInfo);
 }

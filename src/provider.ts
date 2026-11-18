@@ -5,7 +5,6 @@ import { modelLister } from "./models";
 import { realSdk, type SdkDeps } from "./sdk";
 import { ClaudeCodeSession } from "./session";
 import {
-  customModels,
   disableClaudeAiConnectors,
   hideBuiltinTools,
   minRateLimitNoticePercent,
@@ -26,16 +25,12 @@ export function createProvider(
     version: ctx.plugin.version,
     readBlob: (blobId) => Bun.file(ctx.store.blobs.path(blobId)).bytes(),
   });
-  // `& { icon }` until @valethq/sdk 0.3.0 (ProviderBase.icon) is published.
-  const provider: AgentProvider & { readonly icon: string } = {
+  const provider: AgentProvider = {
     kind: "agent",
     id: PROVIDER_KEY,
     label: "Claude Code",
     icon: "claude",
-    listModels: modelLister(
-      () => ctx.config,
-      () => customModels(ctx),
-    ),
+    listModels: modelLister(() => ctx.config),
     utility: createUtility(ctx, deps),
     async open(opts): Promise<AgentSession> {
       const session = ctx.store.sessions.get(opts.sessionId);
@@ -53,6 +48,8 @@ export function createProvider(
         id,
         cwd,
         model: opts.model,
+        ...(opts.effort === undefined ? {} : { effort: opts.effort }),
+        ...(opts.fast === undefined ? {} : { fast: opts.fast }),
         mcpServers: [mcp],
         tools: opts.tools,
         reseeded: opts.resumeId !== undefined && id !== opts.resumeId,

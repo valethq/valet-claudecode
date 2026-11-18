@@ -1,99 +1,61 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { PluginContext, SettingsPanel } from "@valethq/sdk";
 import type { ClaudeCodeConfig } from "../src/config";
 import {
-  customModels,
   disableClaudeAiConnectors,
   hideBuiltinTools,
   minRateLimitNoticePercent,
+  permissionMode,
   registerSettings,
   strictMcpConfig,
+  utilityModel,
 } from "../src/settings";
-import { fakeCtx } from "./helpers";
 import { fakeSdk } from "./fake-sdk";
+import { fakeCtx } from "./helpers";
 
 function ctxWith(config: ClaudeCodeConfig) {
   const { ctx } = fakeCtx(config, fakeSdk(async function* () {}).deps);
   return ctx as unknown as PluginContext<ClaudeCodeConfig>;
 }
 
-/** The panel has a form, so get and set are present. */
-type FormPanel = SettingsPanel & Required<Pick<SettingsPanel, "schema" | "get" | "set">>;
+const manifest = JSON.parse(readFileSync(join(import.meta.dir, "..", "manifest.json"), "utf8"));
+const props = manifest.configSchema.properties as Record<string, { default?: unknown }>;
 
-function panelOf(ctx: PluginContext<ClaudeCodeConfig>): FormPanel {
-  let panel: FormPanel | undefined;
-  const scoped = {
-    ...ctx,
-    scopes: {
-      define() {},
-      provide(_scope: string, impl: SettingsPanel) {
-        panel = impl as FormPanel;
-        return { dispose() {} };
-      },
-    },
-  } as unknown as PluginContext<ClaudeCodeConfig>;
-  registerSettings(scoped, fakeSdk(async function* () {}).deps);
-  if (!panel) throw new Error("no panel");
-  return panel;
-}
-
-describe("connector and MCP flags", () => {
-  test("connectors and extra MCP servers default to hidden; built-in tools default to shown", () => {
+describe("settings are config", () => {
+  test("accessors fall back to the same defaults the manifest declares", () => {
     const ctx = ctxWith({});
-    expect(disableClaudeAiConnectors(ctx)).toBe(true);
-    expect(strictMcpConfig(ctx)).toBe(true);
-    expect(hideBuiltinTools(ctx)).toBe(false);
+    expect(permissionMode(ctx)).toBe(props.permissionMode?.default as "acceptEdits");
+    expect(disableClaudeAiConnectors(ctx)).toBe(props.disableClaudeAiConnectors?.default as boolean);
+    expect(strictMcpConfig(ctx)).toBe(props.strictMcpConfig?.default as boolean);
+    expect(hideBuiltinTools(ctx)).toBe(props.hideBuiltinTools?.default as boolean);
+    expect(minRateLimitNoticePercent(ctx)).toBe(props.minRateLimitNoticePercent?.default as number);
+    expect(utilityModel(ctx)).toBe(props.utilityModel?.default as string);
   });
 
-  test("hideBuiltinTools comes from config.json and the panel overrides it", async () => {
-    const ctx = ctxWith({ hideBuiltinTools: true });
+  test("config values win; an empty utility model turns side jobs off", () => {
+    const ctx = ctxWith({
+      permissionMode: "plan",
+      hideBuiltinTools: true,
+      strictMcpConfig: false,
+      minRateLimitNoticePercent: 50,
+      utilityModel: " ",
+    });
+    expect(permissionMode(ctx)).toBe("plan");
     expect(hideBuiltinTools(ctx)).toBe(true);
-    const panel = panelOf(ctx);
-    const props = panel.schema.properties as Record<string, { type: string }>;
-    expect(props.hideBuiltinTools?.type).toBe("boolean");
-    await panel.set({ hideBuiltinTools: false });
-    expect(hideBuiltinTools(ctx)).toBe(false);
-    expect(await panel.get()).toMatchObject({ hideBuiltinTools: false });
-  });
-
-  test("config.json turns them off", () => {
-    const ctx = ctxWith({ disableClaudeAiConnectors: false, strictMcpConfig: false });
-    expect(disableClaudeAiConnectors(ctx)).toBe(false);
     expect(strictMcpConfig(ctx)).toBe(false);
-  });
-
-  test("the settings panel overrides config and shows both in its schema", async () => {
-    const ctx = ctxWith({ disableClaudeAiConnectors: true });
-    const panel = panelOf(ctx);
-    const props = panel.schema.properties as Record<string, { type: string }>;
-    expect(props.disableClaudeAiConnectors?.type).toBe("boolean");
-    expect(props.strictMcpConfig?.type).toBe("boolean");
-    await panel.set({ disableClaudeAiConnectors: false });
-    expect(disableClaudeAiConnectors(ctx)).toBe(false);
-    expect(await panel.get()).toMatchObject({ disableClaudeAiConnectors: false, strictMcpConfig: true });
-  });
-
-  test("the panel rejects non-boolean values", () => {
-    const panel = panelOf(ctxWith({}));
-    expect(() => panel.set({ strictMcpConfig: "yes" })).toThrow("strictMcpConfig must be true or false");
-  });
-});
-
-describe("rate-limit notice threshold", () => {
-  test("defaults to 80, config.json sets it, the panel overrides and validates it", async () => {
-    expect(minRateLimitNoticePercent(ctxWith({}))).toBe(80);
-    const ctx = ctxWith({ minRateLimitNoticePercent: 50 });
     expect(minRateLimitNoticePercent(ctx)).toBe(50);
-    const panel = panelOf(ctx);
-    await panel.set({ minRateLimitNoticePercent: 90 });
-    expect(minRateLimitNoticePercent(ctx)).toBe(90);
-    expect(await panel.get()).toMatchObject({ minRateLimitNoticePercent: 90 });
-    expect(() => panel.set({ minRateLimitNoticePercent: 101 })).toThrow("0 to 100");
+    expect(utilityModel(ctx)).toBeUndefined();
+  });
+
+  test("the manifest no longer carries per-provider custom models", () => {
+    expect(props.customModels).toBeUndefined();
   });
 });
 
-describe("usage on the settings panel", () => {
-  test("shows plan usage above the form, refreshes on a timer, and has a refresh action", async () => {
+describe("usage on the settings page", () => {
+  test("a view-only panel: plan usage, refreshed on a timer, with a refresh action", async () => {
     const sdk = fakeSdk(
       async function* () {},
       new Set(),
@@ -104,13 +66,14 @@ describe("usage on the settings panel", () => {
       }),
     );
     const { ctx } = fakeCtx({}, sdk.deps);
-    let panel: FormPanel | undefined;
+    let panel: SettingsPanel | undefined;
     registerSettings(
       {
         ...ctx,
+        onConfigChange() {},
         scopes: {
           define() {},
-          provide(_s: string, impl: FormPanel) {
+          provide(_s: string, impl: SettingsPanel) {
             panel = impl;
             return { dispose() {} };
           },
@@ -118,23 +81,10 @@ describe("usage on the settings panel", () => {
       } as unknown as PluginContext<ClaudeCodeConfig>,
       sdk.deps,
     );
+    expect(panel?.schema).toBeUndefined();
     expect(panel?.refreshMs).toBe(15_000);
     const blocks = (await panel?.view?.()) ?? [];
     expect(JSON.stringify(blocks)).toContain('"label":"Session"');
     await panel?.actions?.refresh?.({});
-    expect(typeof panel?.actions?.refresh).toBe("function");
   });
-});
-
-test("customModels round-trips through the panel and rejects entries without a model name", async () => {
-  const ctx = ctxWith({});
-  const panel = panelOf(ctx);
-  await panel.set({
-    customModels: [
-      { id: " my-model ", name: "Mine" },
-      { id: "bare", name: "" },
-    ],
-  });
-  expect(customModels(ctx)).toEqual([{ id: "my-model", name: "Mine" }, { id: "bare" }]);
-  expect(() => panel.set({ customModels: [{ id: "" }] })).toThrow("customModels");
 });
