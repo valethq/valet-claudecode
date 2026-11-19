@@ -11,13 +11,14 @@ import type {
   Logger,
   McpServerEntry,
   ModelContent,
+  ModelOptions,
   ToolSurface,
 } from "@valethq/sdk";
 import { cacheStats, claudeEnv } from "./cache";
 import { InputQueue } from "./channel";
 import type { ClaudeCodeConfig, Effort, PermissionMode } from "./config";
 import { mapMessage, mapResult, newTurnState } from "./events";
-import { resolveModel } from "./models";
+import { asEffort } from "./models";
 import type { SdkDeps } from "./sdk";
 import { leakedTools } from "./tools";
 
@@ -29,13 +30,16 @@ export interface SessionInit {
   id: string;
   cwd: string;
   model: string;
+  effort?: string;
+  /** Claude Code's fast mode; unset leaves Claude Code's own setting. */
+  fast?: boolean;
   mcpServers: McpServerEntry[];
   tools: ToolSurface;
   reseeded: boolean;
   /** valet's persona preamble for this session, kept so every child launch appends the same system prompt. */
   preamble: { get(): string | undefined; set(text: string): void };
   cfg(): ClaudeCodeConfig;
-  /** Tool-scope flags, read at each child start so the settings panel applies without a restart. */
+  /** Tool-scope flags, read at each child start so a settings change applies without a restart. */
   flags(): { hideBuiltinTools: boolean; disableClaudeAiConnectors: boolean; strictMcpConfig: boolean };
   mode(): PermissionMode;
   minRateLimitNoticePercent(): number;
@@ -75,6 +79,7 @@ export class ClaudeCodeSession implements AgentSession {
   private pending = false;
   private model: string;
   private effort?: Effort;
+  private fast?: boolean;
   private idle?: ReturnType<typeof setTimeout>;
   private lastContext?: number;
   /** The denyTools the running child was started with, checked against its `system/init` tool list. */
@@ -82,9 +87,9 @@ export class ClaudeCodeSession implements AgentSession {
 
   constructor(private init: SessionInit) {
     this.reseeded = init.reseeded;
-    const { model, effort } = resolveModel(init.model);
-    this.model = model;
-    this.effort = effort;
+    this.model = init.model;
+    this.effort = asEffort(init.effort);
+    this.fast = init.fast;
   }
 
   get resumeId(): string {
@@ -101,6 +106,11 @@ export class ClaudeCodeSession implements AgentSession {
     this.deny = cfg.denyTools;
     const tools = flags.hideBuiltinTools ? [] : cfg.tools;
     const append = [cfg.appendSystemPrompt, this.init.preamble.get()].filter((t) => !!t).join("\n\n");
+    const overlay = {
+      ...(flags.disableClaudeAiConnectors && { disableClaudeAiConnectors: true }),
+      ...(this.fast !== undefined && { fastMode: this.fast }),
+    };
+    const settings = Object.keys(overlay).length > 0 ? overlay : undefined;
     return {
       prompt: input,
       options: {
@@ -127,7 +137,7 @@ export class ClaudeCodeSession implements AgentSession {
         },
         ...(Object.keys(mcpServers).length && { mcpServers }),
         strictMcpConfig: flags.strictMcpConfig,
-        ...(flags.disableClaudeAiConnectors && { settings: { disableClaudeAiConnectors: true } }),
+        ...(settings && { settings }),
         // onFailure "block": a gate that throws or times out must stop the call (the default lets it run)
         hooks: { PreToolUse: [{ hooks: [this.preToolUse], onFailure: "block" }] },
         env: claudeEnv(cfg),
@@ -216,15 +226,19 @@ export class ClaudeCodeSession implements AgentSession {
     this.drop();
   }
 
-  async setModel(next: string): Promise<void> {
-    const { model, effort } = resolveModel(next);
+  async setModel(model: string, options: ModelOptions): Promise<void> {
+    const effort = asEffort(options.effort);
     const modelChanged = model !== this.model;
-    const effortChanged = effort !== this.effort;
+    const flags = {
+      ...(effort !== this.effort && { effortLevel: effort ?? null }),
+      ...(options.fast !== this.fast && { fastMode: options.fast ?? null }),
+    };
     this.model = model;
     this.effort = effort;
+    this.fast = options.fast;
     if (!this.query) return;
     if (modelChanged) await this.query.setModel(model);
-    if (effortChanged) await this.query.applyFlagSettings({ effortLevel: effort ?? null });
+    if (Object.keys(flags).length > 0) await this.query.applyFlagSettings(flags);
   }
 
   async close(): Promise<void> {

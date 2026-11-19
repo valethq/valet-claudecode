@@ -9,8 +9,10 @@ export interface ModelConfig {
   name?: string;
   contextWindow?: number;
   maxOutputTokens?: number;
-  /** Effort levels offered as picker entries ("<id>-<effort>"). Unset = bare id only. */
+  /** Effort levels the model takes. Unset = none to pick. */
   efforts?: Effort[];
+  /** Claude Code's fast mode (`fastMode`) is available for this model. */
+  fast?: boolean;
 }
 
 export interface ClaudeCodeConfig {
@@ -28,7 +30,7 @@ export interface ClaudeCodeConfig {
    * still offered or named by a skill; to stop a built-in being offered, use `denyTools` or `tools`.
    */
   toolAliases?: Record<string, string>;
-  /** Remove every Claude Code built-in tool, leaving valet's MCP tools (`tools: []`). Wins over `tools`. Also in the settings panel. Default false. */
+  /** Remove every Claude Code built-in tool, leaving valet's MCP tools (`tools: []`). Wins over `tools`. Default false. */
   hideBuiltinTools?: boolean;
   /** Defer valet's MCP tools behind Claude Code's tool search instead of loading them into the prompt. Default false. */
   deferValetTools?: boolean;
@@ -48,25 +50,32 @@ export interface ClaudeCodeConfig {
   disableClaudeAiConnectors?: boolean;
   /** Load only the MCP servers valet passes, ignoring project .mcp.json, user settings and plugins. Default true. */
   strictMcpConfig?: boolean;
-  /** Hide "approaching limit" warnings below this percent used (0-100). Hard-limit errors always show. Also in the settings panel. Default 80. */
+  /** Hide "approaching limit" warnings below this percent used (0-100). Hard-limit errors always show. Default 80. */
   minRateLimitNoticePercent?: number;
   pathToClaudeCodeExecutable?: string;
   /** Model for small side jobs such as session naming. Empty string turns them off. */
   utilityModel?: string;
+  /** Replaces the built-in model list. */
   models?: ModelConfig[];
 }
 
-/** Every level the Claude 5 family reports as supported (SDK supportedModels()). */
+/** Every level the Claude 5 family reports as supported (SDK supportedModels()); fast mode on Opus and Fable as its pricing table has it. */
 const DEFAULT_EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
 
 /** Context window and output cap shared by the Claude 5 family (Models API: max_input_tokens / max_tokens). */
 const CLAUDE5_LIMITS = { contextWindow: 1_000_000, maxOutputTokens: 128_000 } as const;
 
 export const DEFAULT_MODELS: ModelConfig[] = [
-  { id: "claude-opus-5-5", name: "Claude Opus 5.5", efforts: DEFAULT_EFFORTS, ...CLAUDE5_LIMITS },
+  { id: "claude-opus-5-5", name: "Claude Opus 5.5", efforts: DEFAULT_EFFORTS, fast: true, ...CLAUDE5_LIMITS },
   { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", efforts: DEFAULT_EFFORTS, ...CLAUDE5_LIMITS },
   { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", efforts: DEFAULT_EFFORTS, ...CLAUDE5_LIMITS },
-  { id: "claude-fable-5-2", name: "Claude Fable 5.2", efforts: DEFAULT_EFFORTS, ...CLAUDE5_LIMITS },
+  {
+    id: "claude-fable-5-2",
+    name: "Claude Fable 5.2",
+    efforts: DEFAULT_EFFORTS,
+    fast: true,
+    ...CLAUDE5_LIMITS,
+  },
 ];
 
 export const DEFAULT_UTILITY_MODEL = "claude-haiku-5-5";

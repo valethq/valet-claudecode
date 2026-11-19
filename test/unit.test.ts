@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { cacheStats, claudeEnv, contextTokens } from "../src/cache";
 import { mapMessage, newTurnState } from "../src/events";
 import { DEFAULT_MODELS } from "../src/config";
-import { resolveModel, toModelInfos } from "../src/models";
+import { modelLister, resolveModel, toModelInfo } from "../src/models";
 import { mcpServerConfig } from "../src/session";
 import { leakedTools } from "../src/tools";
 
@@ -46,19 +46,23 @@ test("resolveModel splits an effort suffix", () => {
   expect(resolveModel("claude-sonnet-5-5")).toEqual({ model: "claude-sonnet-5-5" });
 });
 
-test("toModelInfos offers one picker entry per declared effort and no bare entry", () => {
+test("toModelInfo lists a model once with its efforts and fast mode", () => {
   expect(
-    toModelInfos({ id: "claude-opus-5-5", name: "Opus", efforts: ["low", "max"] }).map((m) => [m.id, m.name]),
-  ).toEqual([
-    ["claude-opus-5-5-low", "Opus (low)"],
-    ["claude-opus-5-5-max", "Opus (max)"],
-  ]);
-  expect(toModelInfos({ id: "claude-haiku-5-5" }).map((m) => m.id)).toEqual(["claude-haiku-5-5"]);
+    toModelInfo({ id: "claude-opus-5-5", name: "Opus", efforts: ["low", "max"], fast: true }),
+  ).toMatchObject({
+    id: "claude-opus-5-5",
+    name: "Opus",
+    efforts: ["low", "max"],
+    fast: true,
+  });
+  const bare = toModelInfo({ id: "claude-haiku-5-5" });
+  expect(bare.efforts).toBeUndefined();
+  expect(bare.fast).toBeUndefined();
 });
 
 test("built-in Claude 5 models advertise the 1M window and 128k output cap", () => {
   for (const m of DEFAULT_MODELS) {
-    expect(toModelInfos(m)[0]).toMatchObject({ contextWindow: 1_000_000, maxOutputTokens: 128_000 });
+    expect(toModelInfo(m)).toMatchObject({ contextWindow: 1_000_000, maxOutputTokens: 128_000 });
   }
 });
 
@@ -195,4 +199,9 @@ test("interrupted tool results map to cancelled when the turn was aborted", () =
   expect(mapMessage(m, newTurnState(), () => true)).toEqual([
     { type: "tool-end", callId: "t", status: "cancelled", output: "[interrupted]" },
   ]);
+});
+
+test("modelLister uses config.models over the built-in list", async () => {
+  expect((await modelLister(() => ({ models: [{ id: "a", name: "A" }] }))()).map((m) => m.id)).toEqual(["a"]);
+  expect((await modelLister(() => undefined)()).map((m) => m.id)).toEqual(DEFAULT_MODELS.map((m) => m.id));
 });

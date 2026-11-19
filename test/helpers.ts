@@ -9,8 +9,11 @@ export function fakeCtx(config: ClaudeCodeConfig, deps: SdkDeps, blobs: Record<s
   const logs: { level: string; msg: string; data?: Record<string, unknown> }[] = [];
   const logger = (level: string) => (msg: string, data?: Record<string, unknown>) =>
     logs.push({ level, msg, data });
+  let current = config;
   const ctx = {
-    config,
+    get config() {
+      return current;
+    },
     plugin: { version: "0.1.0" },
     http: {
       route: () => ({ dispose() {} }),
@@ -41,7 +44,11 @@ export function fakeCtx(config: ClaudeCodeConfig, deps: SdkDeps, blobs: Record<s
     },
   } as unknown as PluginContext<ClaudeCodeConfig>;
   const { provider, dispose } = createProvider(ctx, deps);
-  return { provider: provider as AgentProvider, state, logs, kv, dispose, ctx };
+  /** What core does on a settings save: the new block replaces ctx.config. */
+  const setConfig = (patch: Partial<ClaudeCodeConfig>) => {
+    current = { ...current, ...patch };
+  };
+  return { provider: provider as AgentProvider, state, logs, kv, dispose, ctx, setConfig };
 }
 
 export async function collect(it: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {
@@ -65,7 +72,8 @@ export const open = (h: ReturnType<typeof fakeCtx>, extra: Record<string, unknow
   h.provider.open({
     sessionId: "s1",
     cwd: "/tmp",
-    model: "claude-opus-5-5-high",
+    model: "claude-opus-5-5",
+    effort: "high",
     tools: noTools,
     signal: new AbortController().signal,
     ...extra,

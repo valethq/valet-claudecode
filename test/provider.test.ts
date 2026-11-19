@@ -221,14 +221,16 @@ test("setModel only touches the Query when something changed", async () => {
   h = fakeCtx({}, deps);
   const s = await open(h);
   await collect(s.prompt(input("hi"), ac()));
-  await s.setModel?.("claude-opus-5-5-high");
+  await s.setModel?.("claude-opus-5-5", { effort: "high" });
   expect(calls[0]?.methods).toEqual([]);
-  await s.setModel?.("claude-opus-5-5-low");
+  await s.setModel?.("claude-opus-5-5", { effort: "low" });
   expect(calls[0]?.methods).toEqual([{ name: "applyFlagSettings", args: [{ effortLevel: "low" }] }]);
-  await s.setModel?.("claude-sonnet-5-5");
-  expect(calls[0]?.methods.slice(1)).toEqual([
+  await s.setModel?.("claude-opus-5-5", { effort: "low", fast: true });
+  expect(calls[0]?.methods.at(-1)).toEqual({ name: "applyFlagSettings", args: [{ fastMode: true }] });
+  await s.setModel?.("claude-sonnet-5-5", {});
+  expect(calls[0]?.methods.slice(2)).toEqual([
     { name: "setModel", args: ["claude-sonnet-5-5"] },
-    { name: "applyFlagSettings", args: [{ effortLevel: null }] },
+    { name: "applyFlagSettings", args: [{ effortLevel: null, fastMode: null }] },
   ]);
 });
 
@@ -236,10 +238,11 @@ test("setModel before the first prompt just changes the start options", async ()
   const { deps, calls } = fakeSdk(pong);
   h = fakeCtx({}, deps);
   const s = await open(h);
-  await s.setModel?.("claude-sonnet-5-5-medium");
+  await s.setModel?.("claude-sonnet-5-5", { effort: "medium", fast: true });
   await collect(s.prompt(input("hi"), ac()));
   expect(calls[0]?.options.model).toBe("claude-sonnet-5-5");
   expect(calls[0]?.options.effort).toBe("medium");
+  expect(calls[0]?.options.settings).toEqual({ disableClaudeAiConnectors: true, fastMode: true });
 });
 
 test("idle child closes and the next prompt resumes the same session", async () => {
@@ -303,8 +306,12 @@ test("each turn logs cache statistics", async () => {
 test("listModels uses config, else the defaults", async () => {
   const { deps } = fakeSdk(pong);
   h = fakeCtx({}, deps);
-  expect((await h.provider.listModels()).map((m) => m.id)).not.toContain("claude-opus-5-5");
-  expect((await h.provider.listModels()).map((m) => m.id)).toContain("claude-opus-5-5-high");
+  const listed = await h.provider.listModels();
+  expect(listed.map((m) => m.id)).toContain("claude-opus-5-5");
+  expect(listed.find((m) => m.id === "claude-opus-5-5")).toMatchObject({
+    fast: true,
+    efforts: ["low", "medium", "high", "xhigh", "max"],
+  });
   h = fakeCtx({ models: [{ id: "x", contextWindow: 1_000_000 }] }, deps);
   expect(await h.provider.listModels()).toMatchObject([{ id: "x", name: "x", contextWindow: 1_000_000 }]);
 });
@@ -391,15 +398,15 @@ test("utility runs one tool-free turn on the Utility model", async () => {
   expect(calls[0]?.closed).toBe(true);
 });
 
-test("utility follows the panel setting, splits an effort suffix, and can be turned off", async () => {
+test("utility follows the setting, splits an effort suffix, and can be turned off", async () => {
   const { deps, calls } = fakeSdk(async function* () {
     yield result({ result: "ok" });
   });
   h = fakeCtx({}, deps);
-  h.kv.set("utilityModel", "claude-sonnet-5-5-low");
+  h.setConfig({ utilityModel: "claude-sonnet-5-5-low" });
   await h.provider.utility?.complete({ system: "s", prompt: "p" }, ac());
   expect(calls[0]?.options).toMatchObject({ model: "claude-sonnet-5-5", effort: "low" });
-  h.kv.set("utilityModel", "");
+  h.setConfig({ utilityModel: "" });
   expect(h.provider.utility?.model()).toBeUndefined();
   await expect(h.provider.utility?.complete({ system: "s", prompt: "p" }, ac())).rejects.toThrow(
     "no utility model",
@@ -414,7 +421,7 @@ test("utility rejects on an error result", async () => {
   await expect(h.provider.utility?.complete({ system: "s", prompt: "p" }, ac())).rejects.toThrow("boom");
 });
 
-test("connector and MCP flags reach the child: defaults on, panel overrides apply at the next start", async () => {
+test("connector and MCP flags reach the child: defaults on, a settings change applies at the next start", async () => {
   const { deps, calls } = fakeSdk(pong);
   h = fakeCtx({}, deps);
   const s = await open(h);
@@ -423,8 +430,7 @@ test("connector and MCP flags reach the child: defaults on, panel overrides appl
   expect(first.settings).toEqual({ disableClaudeAiConnectors: true });
   expect(first.strictMcpConfig).toBe(true);
 
-  h.kv.set("disableClaudeAiConnectors", false);
-  h.kv.set("strictMcpConfig", false);
+  h.setConfig({ disableClaudeAiConnectors: false, strictMcpConfig: false });
   const s2 = await open(h, { sessionId: "s2" });
   await collect(s2.prompt(input("hi"), ac()));
   const second = calls[1]?.options as { settings?: unknown; strictMcpConfig?: boolean };
@@ -490,7 +496,7 @@ test("a child whose tool list honours denyTools runs normally", async () => {
   expect(calls[0]?.closed).toBe(false);
 });
 
-test("hideBuiltinTools sends tools: [] and beats a configured tools list; the panel applies at the next start", async () => {
+test("hideBuiltinTools sends tools: [] and beats a configured tools list; a change applies at the next start", async () => {
   const { deps, calls } = fakeSdk(pong);
   h = fakeCtx({ tools: ["Read"], hideBuiltinTools: true }, deps);
   const s = await open(h);
@@ -498,7 +504,7 @@ test("hideBuiltinTools sends tools: [] and beats a configured tools list; the pa
   const first = calls[0]?.options as { tools?: string[] };
   expect(first.tools).toEqual([]);
 
-  h.kv.set("hideBuiltinTools", false);
+  h.setConfig({ hideBuiltinTools: false });
   const s2 = await open(h, { sessionId: "s2" });
   await collect(s2.prompt(input("hi"), ac()));
   const second = calls[1]?.options as { tools?: string[] };

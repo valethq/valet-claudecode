@@ -10,39 +10,181 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
+    "x-icon": "claude",
     "properties": {
-      "permissionMode": { "type": "string", "enum": ["default", "acceptEdits", "plan", "bypassPermissions"] },
-      "denyTools": { "type": "array", "items": { "type": "string" } },
-      "tools": { "type": "array", "items": { "type": "string" } },
-      "toolAliases": { "type": "object", "additionalProperties": { "type": "string" } },
-      "deferValetTools": { "type": "boolean" },
-      "hideBuiltinTools": { "type": "boolean" },
-      "disableClaudeAiConnectors": { "type": "boolean" },
-      "strictMcpConfig": { "type": "boolean" },
-      "utilityModel": { "type": "string" },
-      "appendSystemPrompt": { "type": "string" },
+      "permissionMode": {
+        "type": "string",
+        "title": "Permission mode",
+        "description": "Claude Code's permission mode for new and resumed sessions. Valet's tool gate still sees every call.",
+        "enum": ["default", "acceptEdits", "plan", "bypassPermissions"],
+        "enumNames": ["Ask first", "Accept edits", "Plan", "Bypass permissions"],
+        "default": "acceptEdits",
+        "x-section": "Behaviour"
+      },
+      "utilityModel": {
+        "type": "string",
+        "title": "Utility model",
+        "description": "Model for small side jobs such as naming sessions; may end in an effort (claude-haiku-5-5-low). Empty turns them off.",
+        "default": "claude-haiku-5-5",
+        "x-section": "Behaviour"
+      },
+      "minRateLimitNoticePercent": {
+        "type": "number",
+        "title": "Usage warning threshold (%)",
+        "description": "Only warn about approaching a limit at or above this share. Hitting a limit always shows.",
+        "minimum": 0,
+        "maximum": 100,
+        "default": 80,
+        "x-section": "Behaviour"
+      },
+      "hideBuiltinTools": {
+        "type": "boolean",
+        "title": "Hide built-in tools",
+        "description": "Remove Claude Code's own tools (Bash, Read, Write, Edit, Agent, ...) so only valet's tools are offered.",
+        "default": false,
+        "x-section": "Tools"
+      },
+      "disableClaudeAiConnectors": {
+        "type": "boolean",
+        "title": "Hide claude.ai connectors",
+        "description": "Hide your claude.ai account connectors (Gmail, GitHub, ...). Built-in tools are not affected.",
+        "default": true,
+        "x-section": "Tools"
+      },
+      "strictMcpConfig": {
+        "type": "boolean",
+        "title": "Only valet's MCP servers",
+        "description": "Ignore project .mcp.json, user settings and plugins, so valet's is the only MCP server.",
+        "default": true,
+        "x-section": "Tools"
+      },
+      "deferValetTools": {
+        "type": "boolean",
+        "title": "Defer valet's tools",
+        "description": "Load valet's tools through Claude Code's tool search instead of the prompt.",
+        "default": false,
+        "x-section": "Tools",
+        "x-advanced": true
+      },
+      "denyTools": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "title": "Denied tools",
+        "description": "Built-in tools Claude Code may never use, e.g. Bash.",
+        "x-section": "Tools",
+        "x-advanced": true
+      },
+      "tools": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "title": "Built-in tool set",
+        "description": "The built-in tools offered. Unset keeps Claude Code's defaults; empty removes them all.",
+        "x-section": "Tools",
+        "x-advanced": true
+      },
+      "toolAliases": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Tool aliases",
+        "description": "Run a built-in tool as another tool, e.g. Bash -> mcp__valet__exec.",
+        "x-section": "Tools",
+        "x-advanced": true
+      },
+      "appendSystemPrompt": {
+        "type": "string",
+        "title": "Extra system prompt",
+        "description": "Appended to Claude Code's system prompt for every session. Part of the cached prefix.",
+        "x-widget": "textarea",
+        "x-advanced": true
+      },
       "settingSources": {
         "type": "array",
-        "items": { "type": "string", "enum": ["user", "project", "local"] }
+        "items": {
+          "type": "string",
+          "enum": ["user", "project", "local"]
+        },
+        "title": "Settings files to load",
+        "description": "Claude Code settings files (and CLAUDE.md) to load. None by default: valet supplies the persona.",
+        "x-advanced": true
       },
-      "promptCacheTtl": { "type": "string", "enum": ["5m", "1h"] },
-      "subagentPromptCacheTtl": { "type": "string", "enum": ["5m", "1h"] },
-      "idleCloseMs": { "type": "number" },
-      "mcpToolTimeoutMs": { "type": "number" },
-      "pathToClaudeCodeExecutable": { "type": "string" },
+      "promptCacheTtl": {
+        "type": "string",
+        "enum": ["5m", "1h"],
+        "title": "Prompt cache TTL",
+        "description": "For the main conversation. Unset uses Anthropic's default.",
+        "x-advanced": true
+      },
+      "subagentPromptCacheTtl": {
+        "type": "string",
+        "enum": ["5m", "1h"],
+        "title": "Subagent prompt cache TTL",
+        "description": "For Claude Code's own subagents.",
+        "x-advanced": true
+      },
+      "idleCloseMs": {
+        "type": "number",
+        "title": "Close idle sessions after (ms)",
+        "description": "The next prompt resumes the session. 0 keeps them open.",
+        "minimum": 0,
+        "default": 900000,
+        "x-advanced": true
+      },
+      "mcpToolTimeoutMs": {
+        "type": "number",
+        "title": "Valet tool timeout (ms)",
+        "description": "How long Claude Code waits on one of valet's tools.",
+        "minimum": 1000,
+        "x-advanced": true
+      },
+      "pathToClaudeCodeExecutable": {
+        "type": "string",
+        "title": "Claude Code executable",
+        "description": "Unset uses the one bundled with the Agent SDK.",
+        "x-advanced": true
+      },
       "models": {
         "type": "array",
+        "title": "Model list",
+        "description": "Replaces the built-in list. Rename or hide models on the Models page instead.",
+        "x-advanced": true,
         "items": {
           "type": "object",
           "required": ["id"],
+          "additionalProperties": false,
           "properties": {
-            "id": { "type": "string" },
-            "name": { "type": "string" },
-            "contextWindow": { "type": "number" },
-            "maxOutputTokens": { "type": "number" },
+            "id": {
+              "type": "string",
+              "title": "Model id"
+            },
+            "name": {
+              "type": "string",
+              "title": "Name"
+            },
+            "contextWindow": {
+              "type": "number",
+              "title": "Context window"
+            },
+            "maxOutputTokens": {
+              "type": "number",
+              "title": "Max output"
+            },
             "efforts": {
               "type": "array",
-              "items": { "type": "string", "enum": ["low", "medium", "high", "xhigh", "max"] }
+              "title": "Efforts",
+              "items": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "xhigh", "max"]
+              }
+            },
+            "fast": {
+              "type": "boolean",
+              "title": "Fast mode"
             }
           }
         }
