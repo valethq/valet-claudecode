@@ -59,12 +59,17 @@ describe("settings are config", () => {
   test("v2 values migrate: utility suffixes split into model and effort, the percent becomes a share", () => {
     const utility = settings.find((s) => s.id === "utilityModel");
     const split = new RegExp(((utility?.migrate?.[0]?.map ?? {}) as { match: string }).match, "u");
-    expect({ ...split.exec("claude-sonnet-5-5-xhigh")?.groups }).toEqual({
-      model: "claude-sonnet-5-5",
-      effort: "xhigh",
+    const groups = (s: string): Record<string, string | undefined> => ({ ...split.exec(s)?.groups });
+    expect(groups("claude-sonnet-5-5-xhigh")).toEqual({ model: "claude-sonnet-5-5", effort: "xhigh" });
+    expect(groups("claude-haiku-5-5-low")).toEqual({ model: "claude-haiku-5-5", effort: "low" });
+    expect(groups("claude-opus-4-1-20250805-high")).toEqual({
+      model: "claude-opus-4-1-20250805",
+      effort: "high",
     });
-    expect(split.exec("my-model")?.groups?.model).toBe("my-model");
-    expect(split.exec("")?.groups?.model).toBe("");
+    expect(groups("claude-sonnet-5-5")).toEqual({ model: "claude-sonnet-5-5", effort: undefined });
+    // Ids that merely end in an effort word are real model ids and stay whole.
+    for (const id of ["grok-4-high", "my-proxy-max", "gpt-6-luna-low", "claude-custom-high", "my-model", ""])
+      expect(groups(id)).toEqual({ model: id, effort: undefined });
     expect(settings.find((s) => s.id === "rateLimitNoticeAt")?.migrate).toEqual([
       { from: "minRateLimitNoticePercent", map: { scale: 0.01 } },
     ]);

@@ -84,7 +84,7 @@
                 "migrate": [
                   {
                     "map": {
-                      "match": "^(?<model>.*?)(?:-(?<effort>low|medium|high|xhigh|max))?$"
+                      "match": "^(?<model>claude-(?:opus|sonnet|haiku|fable)(?:-\\d+)+(?=-(?:low|medium|high|xhigh|max)$|$)|.*)(?:-(?<effort>low|medium|high|xhigh|max))?$"
                     }
                   }
                 ]
