@@ -37,7 +37,7 @@ export const strictMcpConfig = (ctx: Ctx): boolean => ctx.config?.strictMcpConfi
 
 /** The usage-warning threshold as a percent (0-100). */
 export const minRateLimitNoticePercent = (ctx: Ctx): number =>
-  Math.round((ctx.config?.rateLimitNoticeAt ?? 0.8) * 100);
+  (ctx.config?.rateLimitNoticeAt ?? 0.8) * 100;
 
 /** settings@2: option sources for the doc's inputs, and live plan usage as a runtime subsection. */
 export function registerSettings(ctx: Ctx, deps: SdkDeps): void {
