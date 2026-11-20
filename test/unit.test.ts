@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { cacheStats, claudeEnv, contextTokens } from "../src/cache";
 import { mapMessage, newTurnState } from "../src/events";
 import { DEFAULT_MODELS } from "../src/config";
-import { modelLister, resolveModel, toModelInfo } from "../src/models";
+import { modelLister, toModelInfo } from "../src/models";
 import { mcpServerConfig } from "../src/session";
 import { leakedTools } from "../src/tools";
 
@@ -38,12 +38,6 @@ test("cacheStats and contextTokens", () => {
   expect(contextTokens(u)).toBe(100);
   expect(cacheStats({ input_tokens: 1, cache_creation_input_tokens: 5 }).write1h).toBe(5);
   expect(cacheStats({})).toMatchObject({ hitRatio: 0 });
-});
-
-test("resolveModel splits an effort suffix", () => {
-  expect(resolveModel("claude-opus-5-5-high")).toEqual({ model: "claude-opus-5-5", effort: "high" });
-  expect(resolveModel("claude-opus-5-5-xhigh")).toEqual({ model: "claude-opus-5-5", effort: "xhigh" });
-  expect(resolveModel("claude-sonnet-5-5")).toEqual({ model: "claude-sonnet-5-5" });
 });
 
 test("toModelInfo lists a model once with its efforts and fast mode", () => {

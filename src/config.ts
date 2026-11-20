@@ -2,6 +2,26 @@ export type PermissionMode = "default" | "acceptEdits" | "plan" | "bypassPermiss
 export const MODES: readonly PermissionMode[] = ["default", "acceptEdits", "plan", "bypassPermissions"];
 
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+/** Claude Code's built-in tools, offered as options for `denyTools` and `tools` (any name is accepted). */
+export const BUILTIN_TOOLS = [
+  "Agent",
+  "AskUserQuestion",
+  "Bash",
+  "BashOutput",
+  "Edit",
+  "ExitPlanMode",
+  "Glob",
+  "Grep",
+  "KillShell",
+  "NotebookEdit",
+  "Read",
+  "Skill",
+  "TodoWrite",
+  "WebFetch",
+  "WebSearch",
+  "Write",
+] as const;
 export type Effort = (typeof EFFORTS)[number];
 
 export interface ModelConfig {
@@ -50,11 +70,11 @@ export interface ClaudeCodeConfig {
   disableClaudeAiConnectors?: boolean;
   /** Load only the MCP servers valet passes, ignoring project .mcp.json, user settings and plugins. Default true. */
   strictMcpConfig?: boolean;
-  /** Hide "approaching limit" warnings below this percent used (0-100). Hard-limit errors always show. Default 80. */
-  minRateLimitNoticePercent?: number;
+  /** Hide "approaching limit" warnings below this share used (0-1). Hard-limit errors always show. Default 0.8. */
+  rateLimitNoticeAt?: number;
   pathToClaudeCodeExecutable?: string;
-  /** Model for small side jobs such as session naming. Empty string turns them off. */
-  utilityModel?: string;
+  /** Model and effort for small side jobs such as session naming. No model (or an empty one) turns them off. */
+  utilityModel?: { model?: string; effort?: Effort };
   /** Replaces the built-in model list. */
   models?: ModelConfig[];
 }

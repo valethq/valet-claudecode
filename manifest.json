@@ -6,188 +6,374 @@
   "description": "inference@1 agent provider claude-code over the Claude Agent SDK.",
   "valet": "^0.1.0",
   "main": "./src/index.ts",
-  "provides": ["inference@1", "settings@1"],
-  "configSchema": {
-    "type": "object",
-    "additionalProperties": false,
-    "x-icon": "claude",
-    "properties": {
-      "permissionMode": {
-        "type": "string",
-        "title": "Permission mode",
-        "description": "Claude Code's permission mode for new and resumed sessions. Valet's tool gate still sees every call.",
-        "enum": ["default", "acceptEdits", "plan", "bypassPermissions"],
-        "enumNames": ["Ask first", "Accept edits", "Plan", "Bypass permissions"],
-        "default": "acceptEdits",
-        "x-section": "Behaviour"
-      },
-      "utilityModel": {
-        "type": "string",
-        "title": "Utility model",
-        "description": "Model for small side jobs such as naming sessions; may end in an effort (claude-haiku-5-5-low). Empty turns them off.",
-        "default": "claude-haiku-5-5",
-        "x-section": "Behaviour"
-      },
-      "minRateLimitNoticePercent": {
-        "type": "number",
-        "title": "Usage warning threshold (%)",
-        "description": "Only warn about approaching a limit at or above this share. Hitting a limit always shows.",
-        "minimum": 0,
-        "maximum": 100,
-        "default": 80,
-        "x-section": "Behaviour"
-      },
-      "hideBuiltinTools": {
-        "type": "boolean",
-        "title": "Hide built-in tools",
-        "description": "Remove Claude Code's own tools (Bash, Read, Write, Edit, Agent, ...) so only valet's tools are offered.",
-        "default": false,
-        "x-section": "Tools"
-      },
-      "disableClaudeAiConnectors": {
-        "type": "boolean",
-        "title": "Hide claude.ai connectors",
-        "description": "Hide your claude.ai account connectors (Gmail, GitHub, ...). Built-in tools are not affected.",
-        "default": true,
-        "x-section": "Tools"
-      },
-      "strictMcpConfig": {
-        "type": "boolean",
-        "title": "Only valet's MCP servers",
-        "description": "Ignore project .mcp.json, user settings and plugins, so valet's is the only MCP server.",
-        "default": true,
-        "x-section": "Tools"
-      },
-      "deferValetTools": {
-        "type": "boolean",
-        "title": "Defer valet's tools",
-        "description": "Load valet's tools through Claude Code's tool search instead of the prompt.",
-        "default": false,
-        "x-section": "Tools",
-        "x-advanced": true
-      },
-      "denyTools": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "title": "Denied tools",
-        "description": "Built-in tools Claude Code may never use, e.g. Bash.",
-        "x-section": "Tools",
-        "x-advanced": true
-      },
-      "tools": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "title": "Built-in tool set",
-        "description": "The built-in tools offered. Unset keeps Claude Code's defaults; empty removes them all.",
-        "x-section": "Tools",
-        "x-advanced": true
-      },
-      "toolAliases": {
-        "type": "object",
-        "additionalProperties": {
-          "type": "string"
-        },
-        "title": "Tool aliases",
-        "description": "Run a built-in tool as another tool, e.g. Bash -> mcp__valet__exec.",
-        "x-section": "Tools",
-        "x-advanced": true
-      },
-      "appendSystemPrompt": {
-        "type": "string",
-        "title": "Extra system prompt",
-        "description": "Appended to Claude Code's system prompt for every session. Part of the cached prefix.",
-        "x-widget": "textarea",
-        "x-advanced": true
-      },
-      "settingSources": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "enum": ["user", "project", "local"]
-        },
-        "title": "Settings files to load",
-        "description": "Claude Code settings files (and CLAUDE.md) to load. None by default: valet supplies the persona.",
-        "x-advanced": true
-      },
-      "promptCacheTtl": {
-        "type": "string",
-        "enum": ["5m", "1h"],
-        "title": "Prompt cache TTL",
-        "description": "For the main conversation. Unset uses Anthropic's default.",
-        "x-advanced": true
-      },
-      "subagentPromptCacheTtl": {
-        "type": "string",
-        "enum": ["5m", "1h"],
-        "title": "Subagent prompt cache TTL",
-        "description": "For Claude Code's own subagents.",
-        "x-advanced": true
-      },
-      "idleCloseMs": {
-        "type": "number",
-        "title": "Close idle sessions after (ms)",
-        "description": "The next prompt resumes the session. 0 keeps them open.",
-        "minimum": 0,
-        "default": 900000,
-        "x-advanced": true
-      },
-      "mcpToolTimeoutMs": {
-        "type": "number",
-        "title": "Valet tool timeout (ms)",
-        "description": "How long Claude Code waits on one of valet's tools.",
-        "minimum": 1000,
-        "x-advanced": true
-      },
-      "pathToClaudeCodeExecutable": {
-        "type": "string",
-        "title": "Claude Code executable",
-        "description": "Unset uses the one bundled with the Agent SDK.",
-        "x-advanced": true
-      },
-      "models": {
-        "type": "array",
-        "title": "Model list",
-        "description": "Replaces the built-in list. Rename or hide models on the Models page instead.",
-        "x-advanced": true,
-        "items": {
-          "type": "object",
-          "required": ["id"],
-          "additionalProperties": false,
-          "properties": {
-            "id": {
-              "type": "string",
-              "title": "Model id"
-            },
-            "name": {
-              "type": "string",
-              "title": "Name"
-            },
-            "contextWindow": {
-              "type": "number",
-              "title": "Context window"
-            },
-            "maxOutputTokens": {
-              "type": "number",
-              "title": "Max output"
-            },
-            "efforts": {
-              "type": "array",
-              "title": "Efforts",
-              "items": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "xhigh", "max"]
+  "provides": ["inference@1", "settings@2"],
+  "settings": {
+    "sections": {
+      "inference": {
+        "subsections": [
+          {
+            "id": "behaviour",
+            "label": "Behaviour",
+            "items": [
+              {
+                "id": "permissionMode",
+                "label": "Permission mode",
+                "summary": "Claude Code's permission mode for new and resumed sessions. Valet's tool gate still sees every call.",
+                "input": {
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "default",
+                      "label": "Ask first"
+                    },
+                    {
+                      "value": "acceptEdits",
+                      "label": "Accept edits"
+                    },
+                    {
+                      "value": "plan",
+                      "label": "Plan"
+                    },
+                    {
+                      "value": "bypassPermissions",
+                      "label": "Bypass permissions"
+                    }
+                  ],
+                  "default": "acceptEdits",
+                  "style": "cards"
+                }
+              },
+              {
+                "id": "utilityModel",
+                "label": "Utility model",
+                "summary": "Model and effort for small side jobs such as naming sessions. No model turns them off.",
+                "input": {
+                  "type": "group",
+                  "layout": "row",
+                  "inputs": [
+                    {
+                      "id": "model",
+                      "type": "ref",
+                      "label": "Model",
+                      "placeholder": "Off",
+                      "options": {
+                        "from": "models"
+                      }
+                    },
+                    {
+                      "id": "effort",
+                      "type": "select",
+                      "label": "Effort",
+                      "options": {
+                        "from": "efforts",
+                        "args": {
+                          "model": {
+                            "$": "utilityModel.model"
+                          }
+                        }
+                      },
+                      "when": {
+                        "set": "utilityModel.model"
+                      }
+                    }
+                  ],
+                  "default": {
+                    "model": "claude-haiku-5-5"
+                  }
+                },
+                "migrate": [
+                  {
+                    "map": {
+                      "match": "^(?<model>.*?)(?:-(?<effort>low|medium|high|xhigh|max))?$"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "rateLimitNoticeAt",
+                "label": "Usage warning threshold",
+                "summary": "Only warn about approaching a limit at or above this share. Hitting a limit always shows.",
+                "input": {
+                  "type": "percent",
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.05,
+                  "style": "slider",
+                  "default": 0.8
+                },
+                "keywords": ["rate limit", "usage"],
+                "migrate": [
+                  {
+                    "from": "minRateLimitNoticePercent",
+                    "map": {
+                      "scale": 0.01
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "appendSystemPrompt",
+                "label": "Extra system prompt",
+                "summary": "Appended to Claude Code's system prompt for every session. Part of the cached prefix.",
+                "input": {
+                  "type": "code",
+                  "language": "markdown",
+                  "lines": 6
+                },
+                "advanced": true
               }
-            },
-            "fast": {
-              "type": "boolean",
-              "title": "Fast mode"
-            }
+            ]
+          },
+          {
+            "id": "tools",
+            "label": "Tools",
+            "summary": "What Claude Code may use besides valet's tools.",
+            "items": [
+              {
+                "id": "hideBuiltinTools",
+                "label": "Hide built-in tools",
+                "summary": "Remove Claude Code's own tools (Bash, Read, Write, Edit, Agent, ...) so only valet's tools are offered.",
+                "input": {
+                  "type": "bool",
+                  "default": false
+                }
+              },
+              {
+                "id": "disableClaudeAiConnectors",
+                "label": "Hide claude.ai connectors",
+                "summary": "Hide your claude.ai account connectors (Gmail, GitHub, ...). Built-in tools are not affected.",
+                "input": {
+                  "type": "bool",
+                  "default": true
+                }
+              },
+              {
+                "id": "strictMcpConfig",
+                "label": "Only valet's MCP servers",
+                "summary": "Ignore project .mcp.json, user settings and plugins, so valet's is the only MCP server.",
+                "input": {
+                  "type": "bool",
+                  "default": true
+                }
+              },
+              {
+                "id": "deferValetTools",
+                "label": "Defer valet's tools",
+                "summary": "Load valet's tools through Claude Code's tool search instead of the prompt.",
+                "input": {
+                  "type": "bool",
+                  "default": false
+                },
+                "advanced": true
+              },
+              {
+                "id": "denyTools",
+                "label": "Denied tools",
+                "summary": "Built-in tools Claude Code may never use, e.g. Bash.",
+                "input": {
+                  "type": "multiselect",
+                  "style": "chips",
+                  "options": {
+                    "from": "builtinTools"
+                  }
+                },
+                "advanced": true
+              },
+              {
+                "id": "tools",
+                "label": "Built-in tool set",
+                "summary": "The built-in tools offered. Unset keeps Claude Code's defaults; empty removes them all.",
+                "input": {
+                  "type": "multiselect",
+                  "style": "chips",
+                  "options": {
+                    "from": "builtinTools"
+                  }
+                },
+                "advanced": true
+              },
+              {
+                "id": "toolAliases",
+                "label": "Tool aliases",
+                "summary": "Run a built-in tool as another tool, e.g. Bash -> mcp__valet__exec.",
+                "input": {
+                  "type": "map",
+                  "key": {
+                    "type": "string",
+                    "label": "Built-in tool"
+                  },
+                  "value": {
+                    "type": "string",
+                    "label": "Run as"
+                  }
+                },
+                "advanced": true
+              }
+            ]
+          },
+          {
+            "id": "models",
+            "label": "Models",
+            "items": [
+              {
+                "id": "models",
+                "label": "Model list",
+                "summary": "Replaces the built-in list. Rename or hide models on the Models page instead.",
+                "input": {
+                  "type": "list",
+                  "item": {
+                    "type": "group",
+                    "inputs": [
+                      {
+                        "id": "id",
+                        "type": "string",
+                        "label": "Model id",
+                        "required": true
+                      },
+                      {
+                        "id": "name",
+                        "type": "string",
+                        "label": "Name"
+                      },
+                      {
+                        "id": "contextWindow",
+                        "type": "tokens",
+                        "label": "Context window"
+                      },
+                      {
+                        "id": "maxOutputTokens",
+                        "type": "tokens",
+                        "label": "Max output"
+                      },
+                      {
+                        "id": "efforts",
+                        "type": "multiselect",
+                        "options": [
+                          {
+                            "value": "low"
+                          },
+                          {
+                            "value": "medium"
+                          },
+                          {
+                            "value": "high"
+                          },
+                          {
+                            "value": "xhigh"
+                          },
+                          {
+                            "value": "max"
+                          }
+                        ],
+                        "label": "Efforts"
+                      },
+                      {
+                        "id": "fast",
+                        "type": "bool",
+                        "label": "Fast mode"
+                      }
+                    ]
+                  },
+                  "addLabel": "Add model"
+                },
+                "advanced": true
+              }
+            ]
+          },
+          {
+            "id": "runtime",
+            "label": "Runtime",
+            "items": [
+              {
+                "id": "settingSources",
+                "label": "Settings files to load",
+                "summary": "Claude Code settings files (and CLAUDE.md) to load. None by default: valet supplies the persona.",
+                "input": {
+                  "type": "multiselect",
+                  "options": [
+                    {
+                      "value": "user"
+                    },
+                    {
+                      "value": "project"
+                    },
+                    {
+                      "value": "local"
+                    }
+                  ]
+                },
+                "advanced": true
+              },
+              {
+                "id": "promptCacheTtl",
+                "label": "Prompt cache TTL",
+                "summary": "For the main conversation. Unset uses Anthropic's default.",
+                "input": {
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "5m"
+                    },
+                    {
+                      "value": "1h"
+                    }
+                  ]
+                },
+                "advanced": true
+              },
+              {
+                "id": "subagentPromptCacheTtl",
+                "label": "Subagent prompt cache TTL",
+                "summary": "For Claude Code's own subagents.",
+                "input": {
+                  "type": "select",
+                  "options": [
+                    {
+                      "value": "5m"
+                    },
+                    {
+                      "value": "1h"
+                    }
+                  ]
+                },
+                "advanced": true
+              },
+              {
+                "id": "idleCloseMs",
+                "label": "Close idle sessions after (ms)",
+                "summary": "The next prompt resumes the session. 0 keeps them open.",
+                "input": {
+                  "type": "duration",
+                  "min": 0,
+                  "default": "15m"
+                },
+                "advanced": true
+              },
+              {
+                "id": "mcpToolTimeoutMs",
+                "label": "Valet tool timeout (ms)",
+                "summary": "How long Claude Code waits on one of valet's tools.",
+                "input": {
+                  "type": "duration",
+                  "min": 1000
+                },
+                "advanced": true
+              },
+              {
+                "id": "pathToClaudeCodeExecutable",
+                "label": "Claude Code executable",
+                "summary": "Unset uses the one bundled with the Agent SDK.",
+                "input": {
+                  "type": "path",
+                  "kind": "file"
+                },
+                "advanced": true,
+                "apply": "restart"
+              }
+            ]
           }
-        }
+        ],
+        "icon": "claude"
       }
     }
   }

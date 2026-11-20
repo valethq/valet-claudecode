@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PluginContext, SettingsPanel } from "@valethq/sdk";
+import type { PluginContext, Setting, SettingsContribution } from "@valethq/sdk";
 import type { ClaudeCodeConfig } from "../src/config";
 import {
   disableClaudeAiConnectors,
@@ -21,7 +21,10 @@ function ctxWith(config: ClaudeCodeConfig) {
 }
 
 const manifest = JSON.parse(readFileSync(join(import.meta.dir, "..", "manifest.json"), "utf8"));
-const props = manifest.configSchema.properties as Record<string, { default?: unknown }>;
+const settings = (manifest.settings.sections.inference.subsections as { items: Setting[] }[]).flatMap(
+  (s) => s.items,
+);
+const props = Object.fromEntries(settings.map((s) => [s.id, { default: s.input.default }]));
 
 describe("settings are config", () => {
   test("accessors fall back to the same defaults the manifest declares", () => {
@@ -30,8 +33,8 @@ describe("settings are config", () => {
     expect(disableClaudeAiConnectors(ctx)).toBe(props.disableClaudeAiConnectors?.default as boolean);
     expect(strictMcpConfig(ctx)).toBe(props.strictMcpConfig?.default as boolean);
     expect(hideBuiltinTools(ctx)).toBe(props.hideBuiltinTools?.default as boolean);
-    expect(minRateLimitNoticePercent(ctx)).toBe(props.minRateLimitNoticePercent?.default as number);
-    expect(utilityModel(ctx)).toBe(props.utilityModel?.default as string);
+    expect(minRateLimitNoticePercent(ctx)).toBe((props.rateLimitNoticeAt?.default as number) * 100);
+    expect(utilityModel(ctx)).toEqual(props.utilityModel?.default as { model: string });
   });
 
   test("config values win; an empty utility model turns side jobs off", () => {
@@ -39,8 +42,8 @@ describe("settings are config", () => {
       permissionMode: "plan",
       hideBuiltinTools: true,
       strictMcpConfig: false,
-      minRateLimitNoticePercent: 50,
-      utilityModel: " ",
+      rateLimitNoticeAt: 0.5,
+      utilityModel: { model: " ", effort: "low" },
     });
     expect(permissionMode(ctx)).toBe("plan");
     expect(hideBuiltinTools(ctx)).toBe(true);
@@ -52,10 +55,24 @@ describe("settings are config", () => {
   test("the manifest no longer carries per-provider custom models", () => {
     expect(props.customModels).toBeUndefined();
   });
+
+  test("v2 values migrate: utility suffixes split into model and effort, the percent becomes a share", () => {
+    const utility = settings.find((s) => s.id === "utilityModel");
+    const split = new RegExp(((utility?.migrate?.[0]?.map ?? {}) as { match: string }).match, "u");
+    expect({ ...split.exec("claude-sonnet-5-5-xhigh")?.groups }).toEqual({
+      model: "claude-sonnet-5-5",
+      effort: "xhigh",
+    });
+    expect(split.exec("my-model")?.groups?.model).toBe("my-model");
+    expect(split.exec("")?.groups?.model).toBe("");
+    expect(settings.find((s) => s.id === "rateLimitNoticeAt")?.migrate).toEqual([
+      { from: "minRateLimitNoticePercent", map: { scale: 0.01 } },
+    ]);
+  });
 });
 
-describe("usage on the settings page", () => {
-  test("a view-only panel: plan usage, refreshed on a timer, with a refresh action", async () => {
+describe("settings@2 contribution", () => {
+  test("model and effort options, built-in tools, and plan usage as a runtime subsection", async () => {
     const sdk = fakeSdk(
       async function* () {},
       new Set(),
@@ -66,25 +83,33 @@ describe("usage on the settings page", () => {
       }),
     );
     const { ctx } = fakeCtx({}, sdk.deps);
-    let panel: SettingsPanel | undefined;
+    let contribution: SettingsContribution | undefined;
     registerSettings(
       {
         ...ctx,
+        config: ctx.config,
         onConfigChange() {},
         scopes: {
           define() {},
-          provide(_s: string, impl: SettingsPanel) {
-            panel = impl;
+          provide(_s: string, impl: SettingsContribution) {
+            contribution = impl;
             return { dispose() {} };
           },
         },
       } as unknown as PluginContext<ClaudeCodeConfig>,
       sdk.deps,
     );
-    expect(panel?.schema).toBeUndefined();
-    expect(panel?.refreshMs).toBe(15_000);
-    const blocks = (await panel?.view?.()) ?? [];
-    expect(JSON.stringify(blocks)).toContain('"label":"Session"');
-    await panel?.actions?.refresh?.({});
+    const models = (await contribution?.options?.models?.({})) ?? [];
+    expect(models.map((m) => m.value)).toContain("claude-haiku-5-5");
+    expect(await contribution?.options?.efforts?.({ model: "claude-haiku-5-5" })).toEqual(
+      ["low", "medium", "high", "xhigh", "max"].map((value) => ({ value })),
+    );
+    expect(await contribution?.options?.efforts?.({ model: "nope" })).toEqual([]);
+    expect((await contribution?.options?.builtinTools?.({}))?.map((o) => o.value)).toContain("Bash");
+    const [usage] = (await contribution?.subsections?.()) ?? [];
+    expect(usage?.id).toBe("usage");
+    expect(usage?.refreshMs).toBe(15_000);
+    expect(JSON.stringify(usage?.items)).toContain('"label":"Session"');
+    await contribution?.actions?.refresh?.({});
   });
 });
