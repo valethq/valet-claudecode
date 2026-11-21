@@ -1,5 +1,13 @@
-import type { PluginContext } from "@valethq/sdk";
-import { type ClaudeCodeConfig, DEFAULT_UTILITY_MODEL, MODES, type PermissionMode } from "./config";
+import type { Option, PluginContext } from "@valethq/sdk";
+import {
+  BUILTIN_TOOLS,
+  type ClaudeCodeConfig,
+  DEFAULT_UTILITY_MODEL,
+  type Effort,
+  MODES,
+  type PermissionMode,
+} from "./config";
+import { asEffort, modelLister } from "./models";
 import type { SdkDeps } from "./sdk";
 import { createUsage } from "./usage";
 
@@ -12,10 +20,13 @@ export function permissionMode(ctx: Ctx): PermissionMode {
   return v !== undefined && MODES.includes(v) ? v : "acceptEdits";
 }
 
-/** The Utility model; an empty string turns it off. */
-export function utilityModel(ctx: Ctx): string | undefined {
-  const v = (ctx.config?.utilityModel ?? DEFAULT_UTILITY_MODEL).trim();
-  return v === "" ? undefined : v;
+/** The Utility model and its effort; no model (or an empty one) turns it off. */
+export function utilityModel(ctx: Ctx): { model: string; effort?: Effort } | undefined {
+  const v = ctx.config?.utilityModel ?? { model: DEFAULT_UTILITY_MODEL };
+  const model = v.model?.trim() ?? "";
+  if (model === "") return undefined;
+  const effort = asEffort(v.effort);
+  return effort ? { model, effort } : { model };
 }
 
 export const hideBuiltinTools = (ctx: Ctx): boolean => ctx.config?.hideBuiltinTools ?? false;
@@ -24,21 +35,26 @@ export const disableClaudeAiConnectors = (ctx: Ctx): boolean => ctx.config?.disa
 
 export const strictMcpConfig = (ctx: Ctx): boolean => ctx.config?.strictMcpConfig ?? true;
 
-export const minRateLimitNoticePercent = (ctx: Ctx): number => ctx.config?.minRateLimitNoticePercent ?? 80;
+/** The usage-warning threshold as a percent (0-100). */
+export const minRateLimitNoticePercent = (ctx: Ctx): number =>
+  (ctx.config?.rateLimitNoticeAt ?? 0.8) * 100;
 
-/** The plugin's settings page carries live plan usage above the config form. */
+/** settings@2: option sources for the doc's inputs, and live plan usage as a runtime subsection. */
 export function registerSettings(ctx: Ctx, deps: SdkDeps): void {
   const usage = createUsage(ctx, deps);
-  ctx.scopes.define({ name: "settings", version: 1, cardinality: "many" });
+  const models = modelLister(() => ctx.config);
+  ctx.scopes.define({ name: "settings", version: 2, cardinality: "many" });
   ctx.onConfigChange(() => {}); // every value is read from ctx.config when it is used
-  ctx.scopes.provide(
-    "settings",
-    {
-      title: "Plan usage",
-      view: () => usage.view(),
-      refreshMs: 15_000,
-      actions: { refresh: () => usage.refresh(true) },
+  ctx.scopes.provide("settings", {
+    options: {
+      models: async (): Promise<Option[]> => (await models()).map((m) => ({ value: m.id, label: m.name })),
+      efforts: async ({ model }): Promise<Option[]> =>
+        ((await models()).find((m) => m.id === model)?.efforts ?? []).map((e) => ({ value: e })),
+      builtinTools: (): Option[] => BUILTIN_TOOLS.map((t) => ({ value: t })),
     },
-    { key: "valet-claudecode" },
-  );
+    actions: { refresh: () => usage.refresh(true) },
+    subsections: async () => [
+      { id: "usage", label: "Plan usage", order: -1, refreshMs: 15_000, items: await usage.view() },
+    ],
+  });
 }

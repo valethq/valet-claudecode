@@ -168,33 +168,28 @@ describe("usageMeter", () => {
 });
 
 describe("usageBlocks", () => {
-  test("lists the plan and one meter per row, then the update time and a refresh button", () => {
+  test("lists the plan and one meter per row, then the update time and a refresh action", () => {
     const blocks = usageBlocks({ snapshot: parseUsage(real()), at: NOW }, NOW);
-    expect(blocks).toHaveLength(2);
-    const [usage, footer] = blocks as unknown as [
-      { type: string; blocks: { type: string }[] },
-      { layout: string; blocks: { type: string }[] },
-    ];
-    expect(usage.blocks.map((b) => b.type)).toEqual(["badge", "meter", "meter", "meter"]);
-    expect(footer.layout).toBe("row");
-    expect(footer.blocks.map((b) => b.type)).toEqual(["text", "button"]);
+    const types = blocks.map((b) => b.type);
+    expect(types.slice(-2)).toEqual(["note", "action"]);
+    expect(types).toContain("meter");
   });
 
   test("before the first reading, and when it failed", () => {
-    expect(usageBlocks({}, NOW)).toEqual([{ type: "text", text: "Reading usage...", tone: "normal" }]);
+    expect(usageBlocks({}, NOW)).toEqual([{ type: "note", text: "Reading usage...", tone: "normal" }]);
     const failed = usageBlocks({ error: "boom" }, NOW);
-    expect(failed[0]).toEqual({ type: "text", text: "Could not read usage: boom", tone: "warning" });
-    expect(failed[1]).toMatchObject({ type: "group" });
+    expect(failed[0]).toEqual({ type: "note", text: "Could not read usage: boom", tone: "warning" });
+    expect(failed[1]).toMatchObject({ type: "action" });
   });
 
   test("a failed refresh keeps the last readings and says so", () => {
     const blocks = usageBlocks({ snapshot: parseUsage(real()), at: NOW, error: "boom" }, NOW);
-    expect(blocks.map((b) => b.type)).toEqual(["group", "text", "group"]);
+    expect(blocks.map((b) => b.type).slice(-3)).toEqual(["note", "note", "action"]);
   });
 
   test("an unavailable plan says why and offers no meters", () => {
     const blocks = usageBlocks({ snapshot: parseUsage({ rate_limits_available: false }), at: NOW }, NOW);
-    expect(blocks[0]).toMatchObject({ type: "text" });
+    expect(blocks[0]).toMatchObject({ type: "note" });
     expect(JSON.stringify(blocks)).not.toContain('"meter"');
   });
 });

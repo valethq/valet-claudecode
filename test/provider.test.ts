@@ -398,15 +398,15 @@ test("utility runs one tool-free turn on the Utility model", async () => {
   expect(calls[0]?.closed).toBe(true);
 });
 
-test("utility follows the setting, splits an effort suffix, and can be turned off", async () => {
+test("utility follows the model and effort setting, and can be turned off", async () => {
   const { deps, calls } = fakeSdk(async function* () {
     yield result({ result: "ok" });
   });
   h = fakeCtx({}, deps);
-  h.setConfig({ utilityModel: "claude-sonnet-5-5-low" });
+  h.setConfig({ utilityModel: { model: "claude-sonnet-5-5", effort: "low" } });
   await h.provider.utility?.complete({ system: "s", prompt: "p" }, ac());
   expect(calls[0]?.options).toMatchObject({ model: "claude-sonnet-5-5", effort: "low" });
-  h.setConfig({ utilityModel: "" });
+  h.setConfig({ utilityModel: { model: "" } });
   expect(h.provider.utility?.model()).toBeUndefined();
   await expect(h.provider.utility?.complete({ system: "s", prompt: "p" }, ac())).rejects.toThrow(
     "no utility model",
