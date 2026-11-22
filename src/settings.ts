@@ -36,8 +36,7 @@ export const disableClaudeAiConnectors = (ctx: Ctx): boolean => ctx.config?.disa
 export const strictMcpConfig = (ctx: Ctx): boolean => ctx.config?.strictMcpConfig ?? true;
 
 /** The usage-warning threshold as a percent (0-100). */
-export const minRateLimitNoticePercent = (ctx: Ctx): number =>
-  (ctx.config?.rateLimitNoticeAt ?? 0.8) * 100;
+export const minRateLimitNoticePercent = (ctx: Ctx): number => (ctx.config?.rateLimitNoticeAt ?? 0.8) * 100;
 
 /** settings@2: option sources for the doc's inputs, and live plan usage as a runtime subsection. */
 export function registerSettings(ctx: Ctx, deps: SdkDeps): void {
