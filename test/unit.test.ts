@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
 import { cacheStats, claudeEnv, contextTokens } from "../src/cache";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { mapMessage, newTurnState } from "../src/events";
 import { DEFAULT_MODELS } from "../src/config";
 import { modelLister, toModelInfo } from "../src/models";
@@ -24,6 +27,27 @@ test("claudeEnv sets TTLs only when configured, and an explicit variable wins", 
 test("claudeEnv lifts Claude Code's 60s MCP tool timeout", () => {
   expect(claudeEnv({}, {}).MCP_TOOL_TIMEOUT).toBe(String(24 * 3_600_000));
   expect(claudeEnv({ mcpToolTimeoutMs: 5000 }, {}).MCP_TOOL_TIMEOUT).toBe("5000");
+});
+
+test("claudeEnv applies settings.json env only when asked, and the host env wins", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cc-settings-"));
+  const file = join(dir, "settings.json");
+  writeFileSync(
+    file,
+    JSON.stringify({ env: { ANTHROPIC_BASE_URL: "http://x", ANTHROPIC_AUTH_TOKEN: "t", N: 1 } }),
+  );
+  try {
+    expect(claudeEnv({}, {}, file).ANTHROPIC_BASE_URL).toBeUndefined();
+    const on = claudeEnv({ loadSettingsEnv: true }, { ANTHROPIC_AUTH_TOKEN: "host" }, file);
+    expect(on.ANTHROPIC_BASE_URL).toBe("http://x");
+    expect(on.ANTHROPIC_AUTH_TOKEN).toBe("host");
+    expect(on.N).toBeUndefined();
+    expect(
+      claudeEnv({ loadSettingsEnv: true }, {}, join(dir, "missing.json")).ANTHROPIC_BASE_URL,
+    ).toBeUndefined();
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
 });
 
 test("cacheStats and contextTokens", () => {

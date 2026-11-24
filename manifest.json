@@ -306,6 +306,16 @@
                 "advanced": true
               },
               {
+                "id": "loadSettingsEnv",
+                "label": "Apply env from Claude Code settings",
+                "summary": "Pass the env entries of ~/.claude/settings.json (API key, endpoint, model overrides) to Claude Code. Variables already set in valet's environment win.",
+                "input": {
+                  "type": "bool",
+                  "default": false
+                },
+                "advanced": true
+              },
+              {
                 "id": "promptCacheTtl",
                 "label": "Prompt cache TTL",
                 "summary": "For the main conversation. Unset uses Anthropic's default.",

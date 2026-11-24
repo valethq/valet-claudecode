@@ -58,6 +58,8 @@ export interface ClaudeCodeConfig {
   appendSystemPrompt?: string;
   /** Which Claude Code settings files (and CLAUDE.md / AGENTS.md) to load. Default none: valet supplies the persona. */
   settingSources?: ("user" | "project" | "local")[];
+  /** Apply the `env` block of the user's ~/.claude/settings.json (API key, endpoint, ...) to the child. Host env wins. Default false. */
+  loadSettingsEnv?: boolean;
   /** CLAUDE_CODE_PROMPT_CACHE_TTL for main-conversation requests. Unset = Anthropic's default (1h on subscription). */
   promptCacheTtl?: "5m" | "1h";
   /** CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL for Claude Code's own subagents. Unset = default (5m). */
