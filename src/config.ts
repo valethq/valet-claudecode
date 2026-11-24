@@ -37,7 +37,7 @@ export interface ModelConfig {
 
 export interface ClaudeCodeConfig {
   permissionMode?: PermissionMode;
-  /** Tools Claude Code may never use (hard deny), e.g. ["Bash"] to steer to valet-exec over MCP. */
+  /** Tools Claude Code may never use (hard deny), e.g. ["Bash"] to steer to valet's tools over MCP. */
   denyTools?: string[];
   /**
    * Base set of built-in tools Claude Code offers (SDK `tools`). `[]` removes them all, leaving valet's MCP

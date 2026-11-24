@@ -2,7 +2,7 @@
 
 `inference@1` agent provider `claude-code`, built on the Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`).
 
-A [valet](https://github.com/valethq/valet-core) plugin and a sibling of `valet-devin`: Claude Code runs the loop and its own tools, and valet mirrors the stream into messages and parts. It authenticates as whoever is logged in to `claude` on the host (a subscription works), so there is no API key in valet.
+A [valet](https://github.com/valethq/valet-core) plugin: Claude Code runs the loop and its own tools, and valet mirrors the stream into messages and parts. It authenticates as whoever is logged in to `claude` on the host (a subscription works), so there is no API key in valet.
 
 Imports `@valethq/sdk` only, plus the Agent SDK. The Agent SDK is the one dependency this repo adds; the rest of the repo's rules are unchanged.
 
@@ -54,7 +54,7 @@ Settings are this plugin's config (valet-core 12.1): the UI edits them through c
 | Key                                        | Meaning                                                                                                                                                                                                                                   |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `permissionMode`                           | `default` / `acceptEdits` (default) / `plan` / `bypassPermissions`.                                                                                                                                                                       |
-| `denyTools`                                | Hard-denied tools (`disallowedTools`), e.g. `["Bash"]` to steer to `valet-exec` over MCP. A child that still lists one is closed (see Tool gating).                                                                                       |
+| `denyTools`                                | Hard-denied tools (`disallowedTools`), e.g. `["Bash"]` to steer to valet's tools over MCP. A child that still lists one is closed (see Tool gating).                                                                                      |
 | `hideBuiltinTools`                         | Default `false`. `true` removes every built-in tool so only valet's MCP tools are offered.                                                                                                                                                |
 | `tools`                                    | Base set of built-in tools; `[]` removes them all. Unset keeps Claude Code's defaults.                                                                                                                                                    |
 | `toolAliases`                              | Redirect a built-in the model emits to another tool, e.g. `{ "Bash": "mcp__valet__exec" }`.                                                                                                                                               |
